@@ -1,0 +1,18 @@
+---
+description: JSON-RPC protocol — Perch-safe methods, no raw CDP on the public surface
+globs: "packages/protocol/**/*.ts"
+alwaysApply: false
+---
+
+# Protocol (`@tyto/protocol`)
+
+JSON-RPC 2.0. Methods are the product surface, not CDP method names.
+
+- `PERCH_SAFE_METHODS` is the allowlist for Perch and MCP.
+- Do not add `cdp.send`, `debug.cdp`, or credential read/write to that list.
+- `identity.status` is allowed. `identity.capture` is host-internal.
+- Errors: JSON-RPC `error.code` + stable `message`. No stack traces to clients.
+- Params/results are JSON-serializable. No `Map`, no `backendNodeId` in
+  session payloads.
+
+When adding a method: test that MCP tool list still equals the Perch-safe set.

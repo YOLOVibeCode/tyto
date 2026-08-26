@@ -1,0 +1,30 @@
+---
+description: Chrome DevTools Protocol adapter — trusted input, loopback, no Playwright
+globs: "packages/cdp/**/*.ts"
+alwaysApply: false
+---
+
+# CDP adapter (`@tyto/cdp`)
+
+This package owns the Chrome/Edge wire. **Playwright is forbidden here.**
+
+- Spawn with `--remote-debugging-address=127.0.0.1` and an ephemeral port.
+  Connect to `/json/version`. Never bind the debug port on all interfaces.
+- Perception: `Accessibility.getFullAXTree` per attached frame. Auto-attach
+  OOPIFs (`Target.setAutoAttach`). Empty child → tape + `reasonEmpty`, no throw.
+- Action: `DOM.getBoxModel` then `Input.dispatchMouseEvent` / `insertText`
+  **on the focused frame's session**. Do not `Runtime.evaluate("el.click()")`.
+- Clicks use **that target's** coordinates. Parent CSS coords into a child
+  iframe is a bug — contract-test it.
+- Observe: Runtime/Log/Page/Network events. Debugger **stepping stays off**.
+- `CredentialStorePort`: `Network.getAllCookies` (httpOnly). Never
+  `document.cookie`. Do not log cookie values.
+- Negotiate/IWA: `--auth-server-allowlist`; do not extract OS tickets.
+
+```ts
+// ❌ BAD
+await cdp.send("Runtime.evaluate", { expression: "el.click()" });
+
+// ✅ GOOD
+await cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", clickCount: 1 });
+```

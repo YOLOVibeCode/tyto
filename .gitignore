@@ -55,8 +55,13 @@ playwright-report/
 test-results/
 blob-report/
 
-# Local-only
-*.local
-.cursor/
+# Local-only editor junk. Committed agent rules stay in-tree.
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+.claude/*
+!.claude/rules/
+!.claude/rules/**
+!.claude/README.md
 canvases/
 agent-transcripts/

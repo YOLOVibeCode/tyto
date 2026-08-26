@@ -17,6 +17,7 @@ A [YOLOVibeCode](https://github.com/YOLOVibeCode) public repo. Product: Noctusof
 | Spec | [docs/SPEC.md](./docs/SPEC.md) |
 | Design | [docs/DESIGN.md](./docs/DESIGN.md) |
 | Implementation (TDD + ISP) | [docs/IMPLEMENTATION.md](./docs/IMPLEMENTATION.md) |
+| Agent rules | [AGENTS.md](./AGENTS.md) · [CLAUDE.md](./CLAUDE.md) · [`.cursor/rules`](./.cursor/rules/) |
 | Security | [SECURITY.md](./SECURITY.md) |
 | License | [MIT](./LICENSE) |
 

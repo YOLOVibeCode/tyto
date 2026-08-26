@@ -3,6 +3,18 @@
 Tyto is built **TDD + ISP**. Read [docs/IMPLEMENTATION.md](./docs/IMPLEMENTATION.md)
 before writing code.
 
+## Agent rules (mandatory)
+
+Coding agents **must** follow TDD, ISP, and stack standards:
+
+| For | Where |
+|---|---|
+| Cursor | [`.cursor/rules/`](./.cursor/rules/) (`alwaysApply` + per-glob) |
+| Cursor Cloud / AGENTS | [`AGENTS.md`](./AGENTS.md) |
+| Claude Code | [`CLAUDE.md`](./CLAUDE.md) + [`.claude/rules/`](./.claude/rules/) |
+
+If a change conflicts with those rules, **the rules win**.
+
 ## Setup
 
 ```bash

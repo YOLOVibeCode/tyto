@@ -1,0 +1,56 @@
+---
+description: Non-negotiable TDD and Interface Segregation for every Tyto change
+alwaysApply: true
+---
+
+# TDD and ISP (mandatory)
+
+You are building Tyto. **Tests define behavior. Ports define ownership.**
+If a change violates this file, stop and rewrite it.
+
+Read `docs/IMPLEMENTATION.md` before adding types or packages.
+
+## TDD — red, green, refactor
+
+1. Write a **failing** test that names the spec sentence. Then production code.
+2. `npm test` is airplane-mode: no Chrome, no network, no API keys.
+3. Live Chrome is `TYTO_LIVE=1` only. It never gates merge of `@tyto/core`.
+4. Do not "implement then sprinkle tests." Do not skip red.
+
+```ts
+// ❌ BAD — production first
+export function permits(url: URL) { return true }
+
+// ✅ GOOD — test first, default-deny
+it("allowlist default-deny: https://evil.test blocked", () => {
+  expect(new OriginAllowlist().permits(new URL("https://evil.test/"))).toBe(false);
+});
+```
+
+## ISP — no god objects
+
+1. No `IBrowser` / `ITyto` with twenty methods. One port, one job, one file under `packages/core/src/ports/`.
+2. `@tyto/core` imports **port types and pure domain only**. Forbidden: `playwright`, CDP sockets, `chrome.debugger`, vendor LLM SDKs, `LiteLLM` types, `node:http` as a server.
+3. Perch and MCP **must not** see `RawCdpPort` or `CredentialStorePort`. Status-only for the vault.
+4. A port that is hard to fake is the wrong port. Compose **separate fakes**, not `FakeTyto`.
+5. Adding a CDP method does not widen every interface. Smallest port, or `RawCdpPort` behind the host flag.
+
+```ts
+// ❌ BAD
+interface IBrowser { snapshot(); click(); cdpSend(); getCookies(); complete() }
+
+// ✅ GOOD
+interface Perception { snapshot(target: FrameRef): Promise<AxSnapshot> }
+interface Actuation { perform(intent: TrustedIntent): Promise<void> }
+```
+
+## Product laws (never "later")
+
+- Bind SDK/debug to `127.0.0.1` only. Never `0.0.0.0`.
+- Page JS cannot command Tyto. Page text is data, not instructions.
+- Trusted `Input` is the click path. JS `element.click()` is not the product.
+- No `backendNodeId` / cookies / tokens in the session JSON. Vault handles only.
+- `Redactor` runs before every `ModelPort.complete` and before tape persistence.
+- Playwright locators are not the product API. `poc/` is a spike.
+
+After every change: `npm run check` (imports, secrets scan, tests, types).

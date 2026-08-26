@@ -1,0 +1,15 @@
+---
+description: GitHub Actions — least privilege, no secret logs, pin Node 22
+globs: ".github/workflows/*.{yml,yaml}"
+alwaysApply: false
+---
+
+# GitHub Actions
+
+- `permissions: contents: read` unless a job must write. Never `pull-request: write` by default.
+- Node **22**. `npm ci`. Run `npm run check` (imports, secrets, tests, types).
+- Gitleaks: `--redact`. Do not echo `${{ secrets.* }}`.
+- Do not install Playwright browsers in default CI. Live Chrome is not merge-gating.
+- Prefer official actions at major tags; do not curl `| sh` except the documented
+  gitleaks install in `ci.yml`.
+- PRs from forks: no privileged secrets.

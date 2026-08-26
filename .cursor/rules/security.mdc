@@ -1,0 +1,42 @@
+---
+description: Public-repo and kernel security — secrets, identity vault, loopback
+alwaysApply: true
+---
+
+# Security (public repository)
+
+This repo is public. Treat every commit as world-readable.
+
+## Never commit
+
+`.env`, API keys, `TYTO_HOST_TOKEN`, browser `tmp/` profiles, cookies,
+`Set-Cookie` / `Authorization` values, vault ciphertext, private keys.
+
+Copy `.env.example` → `.env` locally. If a live secret is committed: **rotate**,
+do not only delete the file.
+
+Scanners (must stay green): `npm run secrets:scan`, gitleaks, GitHub secret scanning.
+
+Do not print secret values in logs, test output, or chat.
+
+```ts
+// ❌ BAD
+console.log("cookie", hdr);
+
+// ✅ GOOD
+tape.push("network", redactor.safe(hdr));
+```
+
+## Identity
+
+Auth material is **data AND secret**. Encrypted at rest; DEK in OS keychain
+(memory fake in tests). Restore **only** into Chrome/Edge. No OS ticket harvest,
+no impersonation, no SDK export of cookies.
+
+Capture/restore requires an explicit origin grant. Expired bundles yield to
+the operator — do not replay a dead session.
+
+## Control plane
+
+Host and debug port: `127.0.0.1` + token. Extension: native messaging only;
+no `window.tyto`. Confirm submit / purchase / delete / send.

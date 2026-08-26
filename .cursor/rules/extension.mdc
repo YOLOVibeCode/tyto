@@ -1,0 +1,25 @@
+---
+description: MV3 Chrome/Edge extension — native messaging only, no page command API
+globs: "extension/**/*.{js,ts,json}"
+alwaysApply: false
+---
+
+# Extension (MV3 ATTACH)
+
+The extension is a **hand of the host**, not a Store product that works alone.
+
+- Native messaging to the Tyto host only. Ignore any `{ type: "fromPage" }`.
+- No `window.tyto`, no `postMessage` command channel from the document.
+- Content scripts must not receive a runtime message type that executes CDP.
+- `chrome.debugger` auto-attach on the operator-chosen tab. Debugger banner
+  is accepted in ATTACH mode.
+- Minimal `host_permissions`. No remotely hosted code (`script-src` http).
+- Manifest V3: service worker, no persistent background page, no `eval`.
+
+```js
+// ❌ BAD
+window.tyto = { click: (sel) => chrome.runtime.sendMessage({ cdp: sel }) };
+
+// ✅ GOOD
+chrome.runtime.onMessage.addListener(() => false); // page cannot drive CDP
+```

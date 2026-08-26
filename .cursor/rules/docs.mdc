@@ -1,0 +1,14 @@
+---
+description: Spec and design docs — precise, no live secrets, keep TDD/ISP contract honest
+globs: "docs/**/*.md"
+alwaysApply: false
+---
+
+# Documentation
+
+- Spec/design/impl are the contract. Code follows `docs/IMPLEMENTATION.md` slices.
+- Do not invent Workday-specific drivers or LiteLLM-specific APIs in docs.
+- Examples use fake origins (`example.edu`, `ex.test`) and `[REDACTED]` — never
+  live cookies or keys.
+- When behavior changes, update SPEC + IMPLEMENTATION in the same change.
+- Keep ISP port names identical to `packages/core/src/ports/`.

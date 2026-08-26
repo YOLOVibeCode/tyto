@@ -1,0 +1,36 @@
+---
+description: Strict TypeScript ESM standards for Tyto packages
+globs: "**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# TypeScript (strict)
+
+`tsconfig.base.json` is law: `strict`, `noUncheckedIndexedAccess`,
+`exactOptionalPropertyTypes`, `verbatimModuleSyntax`, Node16 ESM.
+
+- Use `import type` for types. Named exports; no default exports from packages.
+- No `any`. No `as unknown as T` to silence the compiler. No `!` except after an
+  explicit guard.
+- Prefer discriminated unions over `enum`. Exhaustive `switch` with `never`.
+- Optional properties: omit the key, or type `T | undefined` deliberately.
+  Do not pass `{ landmark: undefined }` into a `landmark?: string` field.
+- Public functions: explicit return types on ports and exported domain APIs.
+- Errors: typed domain errors (`ShellNotReady`) for product paths; wrap unknown
+  causes. Empty `catch {}` is forbidden.
+- Imports: `.ts` extensions as the repo already does. No Playwright, `openai`,
+  or `@anthropic-ai/sdk` inside `packages/core`.
+
+```ts
+// ❌ BAD
+function bind(step: any, snap: any) { return snap.refs.get(step.ref)! }
+
+// ✅ GOOD
+export function bind(step: Step, snap: AxSnapshot): BindResult {
+  if (step.op === "press" || step.op === "extract" || step.op === "done") return "ok";
+  // ...
+}
+```
+
+Formatting: 2-space indent, LF, `const`/`let` never `var`. One port per file.
+Composition root is `packages/host` only — adapters do not import each other.
