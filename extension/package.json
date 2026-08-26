@@ -1,0 +1,6 @@
+{
+  "name": "tyto-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MV3 Chrome/Edge extension. Native messaging only. No window command API."
+}

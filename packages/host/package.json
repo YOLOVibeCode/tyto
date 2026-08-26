@@ -1,0 +1,8 @@
+{
+  "name": "@tyto/host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Kernel: loopback bind, token, composition root.",
+  "exports": { ".": "./src/index.ts" }
+}

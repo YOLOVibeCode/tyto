@@ -1,0 +1,8 @@
+# Tyto extension (ATTACH)
+
+Chrome + Edge MV3. Speaks **only** to the host via native messaging.
+Auto-enables `chrome.debugger` on the target tab.
+
+The document must not get a `window.tyto` command API.
+
+See [docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md) Slice 11.

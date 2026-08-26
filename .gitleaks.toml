@@ -1,0 +1,50 @@
+# Gitleaks config for a public Tyto repo.
+# Run: gitleaks detect --source . --config .gitleaks.toml
+# CI:  .github/workflows/gitleaks.yml
+
+title = "tyto"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "tyto-api-key-assignment"
+description = "Assigned TYTO/OpenAI/Anthropic API keys"
+regex = '''(?i)(tyto_api_key|openai_api_key|anthropic_api_key|tyto_host_token)\s*[=:]\s*['"]?[A-Za-z0-9_\-]{16,}'''
+tags = ["key", "tyto"]
+
+[[rules]]
+id = "tyto-sk-prefix"
+description = "OpenAI/Anthropic-style secret prefixes"
+regex = '''sk-(?:ant-|proj-)?[A-Za-z0-9_\-]{20,}'''
+tags = ["key", "openai"]
+
+[[rules]]
+id = "tyto-cookie-header"
+description = "Raw Cookie / Set-Cookie material"
+regex = '''(?i)(?:set-cookie|cookie)\s*[:=]\s*[^\s=]+=[^\s;]{8,}'''
+tags = ["cookie", "session"]
+
+[[rules]]
+id = "tyto-bearer"
+description = "Bearer tokens in source"
+regex = '''(?i)authorization:\s*bearer\s+[A-Za-z0-9\-._~+/]+=*'''
+tags = ["token"]
+
+[allowlist]
+description = "Docs, examples, tests that mention secret *shapes* without live values"
+paths = [
+  '''\.env\.example$''',
+  '''docs/''',
+  '''.*\.md$''',
+  '''packages/core/src/identity/redact\.ts$''',
+  '''packages/core/test/''',
+  '''scripts/check-secrets\.mjs$''',
+  '''\.gitleaks\.toml$''',
+]
+regexes = [
+  '''sk-none''',
+  '''sk-example''',
+  '''REDACTED''',
+  '''Bearer \[REDACTED\]''',
+]

@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "Tyto",
+  "version": "0.1.0",
+  "description": "ATTACH mode: auto debugger + native messaging to the Tyto host. The page cannot command Tyto.",
+  "permissions": ["nativeMessaging", "debugger", "tabs"],
+  "host_permissions": [],
+  "background": { "service_worker": "background.js" }
+}

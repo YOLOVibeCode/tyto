@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.turbo/
+
+# Environment & secrets — never commit
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+*.secret
+secrets/
+vault/
+identity-vault/
+**/*.vault
+**/cookies.json
+**/storage-state.json
+playwright/.auth/
+
+# Browser profiles (cookies, tokens, Local Storage)
+tmp/
+**/user-data-dir/
+**/*-profile/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test artifacts
+playwright-report/
+test-results/
+blob-report/
+
+# Local-only
+*.local
+.cursor/
+canvases/
+agent-transcripts/

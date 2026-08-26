@@ -1,0 +1,7 @@
+{
+  "name": "@tyto/llm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenAI-compatible + Anthropic HTTP. No LiteLLM types."
+}

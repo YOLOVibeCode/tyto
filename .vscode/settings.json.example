@@ -1,0 +1,5 @@
+# These settings are suggestions for contributors. This file is committed.
+{
+  "editor.formatOnSave": true,
+  "typescript.tsdk": "node_modules/typescript/lib"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@tyto/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Claude Code MCP adapter. Same session file. No raw CDP tools.",
+  "dependencies": {
+    "@tyto/protocol": "*"
+  }
+}
