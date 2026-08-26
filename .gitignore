@@ -22,8 +22,8 @@ coverage/
 id_rsa
 id_ed25519
 *.secret
-secrets/
-vault/
+/secrets/
+/vault/
 identity-vault/
 **/*.vault
 **/cookies.json
