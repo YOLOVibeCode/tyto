@@ -1,0 +1,19 @@
+{
+  "origin": "https://app.test",
+  "url": "https://app.test/",
+  "title": "App",
+  "nodes": [
+    {
+      "nodeId": "1",
+      "childIds": ["2"],
+      "role": { "value": "WebArea" },
+      "name": { "value": "App" }
+    },
+    {
+      "nodeId": "2",
+      "parentId": "1",
+      "role": { "value": "statictext" },
+      "name": { "value": "Jump to content" }
+    }
+  ]
+}

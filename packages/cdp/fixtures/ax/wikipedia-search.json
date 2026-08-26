@@ -1,0 +1,28 @@
+{
+  "generation": 1,
+  "origin": "https://en.wikipedia.org",
+  "url": "https://en.wikipedia.org/wiki/Main_Page",
+  "title": "Wikipedia",
+  "nodes": [
+    {
+      "nodeId": "1",
+      "childIds": ["2", "3"],
+      "role": { "value": "WebArea" },
+      "name": { "value": "Wikipedia" }
+    },
+    {
+      "nodeId": "2",
+      "parentId": "1",
+      "role": { "value": "searchbox" },
+      "name": { "value": "Search Wikipedia" },
+      "backendDOMNodeId": 42
+    },
+    {
+      "nodeId": "3",
+      "parentId": "1",
+      "role": { "value": "button" },
+      "name": { "value": "Search" },
+      "backendDOMNodeId": 43
+    }
+  ]
+}

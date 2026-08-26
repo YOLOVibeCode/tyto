@@ -4,5 +4,13 @@
   "private": true,
   "type": "module",
   "description": "Kernel: loopback bind, token, composition root.",
-  "exports": { ".": "./src/index.ts" }
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@tyto/core": "*",
+    "@tyto/protocol": "*"
+  },
+  "devDependencies": {
+    "@tyto/fs": "*",
+    "@tyto/sdk": "*"
+  }
 }

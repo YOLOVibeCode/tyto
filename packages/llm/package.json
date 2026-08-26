@@ -3,5 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "OpenAI-compatible + Anthropic HTTP. No LiteLLM types."
+  "description": "OpenAI-compatible + Anthropic HTTP. No vendor SDK types.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@tyto/core": "*"
+  }
 }

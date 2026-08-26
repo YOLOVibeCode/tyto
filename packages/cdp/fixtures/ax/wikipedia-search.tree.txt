@@ -1,0 +1,2 @@
+[ref_1] searchbox "Search Wikipedia"
+[ref_2] button "Search"
