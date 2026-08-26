@@ -15,4 +15,5 @@ export { DefaultAuthProfiler } from "./auth/classify.ts";
 export { bundleStatus } from "./auth/expiry.ts";
 export { SecretRedactor } from "./identity/redact.ts";
 export { pickWorkingDocument } from "./frame/pick.ts";
-export { AgentLoop } from "./loop/agent-loop.ts";
+export { AgentLoop, type LoopPhase } from "./loop/agent-loop.ts";
+export { RUNNER_EXIT, unattendedExit } from "./runner/exit.ts";

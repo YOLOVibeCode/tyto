@@ -57,15 +57,27 @@ export class FakeClock implements Clock {
 export class FakeOccupancy implements Occupancy {
   active = false;
   interrupted = false;
+  private readonly listeners = new Set<() => void>();
+
+  /** Simulate a real key or mouse from the operator. */
+  noteInput(): void {
+    this.active = true;
+    for (const fn of this.listeners) fn();
+  }
+
   interrupt(): void {
     this.interrupted = true;
-    this.active = true;
+    this.active = false;
+    for (const fn of this.listeners) fn();
   }
+
   operatorActive(): boolean {
     return this.active;
   }
+
   onOperatorInput(fn: () => void): Unsubscribe {
-    return () => void fn;
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
   }
 }
 

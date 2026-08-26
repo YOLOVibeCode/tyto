@@ -3,5 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Sidebar view of the prompt session. Not the source of truth."
+  "description": "Sidebar view of the prompt session. Not the source of truth.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@tyto/sdk": "*"
+  },
+  "devDependencies": {
+    "@tyto/core": "*",
+    "@tyto/fs": "*",
+    "@tyto/host": "*"
+  }
 }

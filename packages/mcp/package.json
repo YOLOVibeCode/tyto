@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Claude Code MCP adapter. Same session file. No raw CDP tools.",
+  "exports": { ".": "./src/index.ts" },
   "dependencies": {
     "@tyto/protocol": "*"
   }

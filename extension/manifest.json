@@ -5,5 +5,5 @@
   "description": "ATTACH mode: auto debugger + native messaging to the Tyto host. The page cannot command Tyto.",
   "permissions": ["nativeMessaging", "debugger", "tabs"],
   "host_permissions": [],
-  "background": { "service_worker": "background.js" }
+  "background": { "service_worker": "background.js", "type": "module" }
 }
