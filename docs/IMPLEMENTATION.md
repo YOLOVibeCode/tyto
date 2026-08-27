@@ -2,6 +2,7 @@
 
 Noctusoft, Inc.  
 Companion to [`SPEC.md`](./SPEC.md) and [`DESIGN.md`](./DESIGN.md)  
+Operator start path: [`USAGE.md`](./USAGE.md)  
 Status: draft 1 — this is the engineering contract
 
 This plan is how we build the spec without growing a god object or a

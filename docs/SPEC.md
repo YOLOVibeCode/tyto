@@ -3,6 +3,7 @@
 Noctusoft, Inc.  
 Status: draft 1 (companion to [`DESIGN.md`](./DESIGN.md))  
 Implementation: [`IMPLEMENTATION.md`](./IMPLEMENTATION.md) — TDD + ISP engineering contract  
+How to run a clone: [`USAGE.md`](./USAGE.md)  
 Audience: anyone building, reviewing, or deciding whether to use Tyto
 
 Tyto is a **separate product**. It is not a Scholarmancy feature, not a

@@ -1,9 +1,14 @@
+import type { Allowlist } from "../ports/allowlist.ts";
 import type { FrameRef, FrameSnap } from "../types.ts";
 
 const BANNER = /cookie|consent|recaptcha|captcha|onetrust/i;
 
-export function pickWorkingDocument(frames: FrameSnap[]): FrameRef | null {
-  const eligible = frames.filter((f) => f.attached && !f.reasonEmpty);
+export function pickWorkingDocument(frames: FrameSnap[], allow?: Allowlist): FrameRef | null {
+  const eligible = frames.filter((f) => {
+    if (!f.attached || f.reasonEmpty) return false;
+    if (allow && !allow.permits(new URL(`${f.origin}/`))) return false;
+    return true;
+  });
   if (eligible.length === 0) return null;
 
   const withRecipes = eligible.filter((f) => f.hasRecipes);

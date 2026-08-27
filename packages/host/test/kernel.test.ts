@@ -3,7 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { emptySession, OriginAllowlist, type Navigation } from "@tyto/core";
-import { FakeObservation, MemorySessionStore } from "@tyto/core/testing";
+import {
+  FakeActuation,
+  FakeModel,
+  FakeObservation,
+  FakeOccupancy,
+  FakePerception,
+  MemorySessionStore,
+} from "@tyto/core/testing";
 import { FilesystemSessionStore } from "@tyto/fs";
 import { RPC_ERROR } from "@tyto/protocol";
 import { RpcError, TytoClient } from "@tyto/sdk";
@@ -125,4 +132,44 @@ describe("host kernel", () => {
     const opened = (await again.call("session.open", { id: "keep" })) as { goal: string };
     expect(opened.goal).toBe("still here");
   }, 10_000);
+
+  it("session.run thinks once then trusted-clicks against fakes; plan persists", async () => {
+    const perception = new FakePerception();
+    const actuation = new FakeActuation();
+    const model = new FakeModel();
+    const occupancy = new FakeOccupancy();
+    perception.currentUrl = "https://en.wikipedia.org/wiki/Main_Page";
+    perception.seedUrl("https://en.wikipedia.org/wiki/Main_Page", [
+      { nodeId: "1", childIds: ["2"], role: { value: "WebArea" }, name: { value: "Wikipedia" } },
+      {
+        nodeId: "2",
+        parentId: "1",
+        role: { value: "button" },
+        name: { value: "Search" },
+        backendDOMNodeId: 43,
+      },
+    ], "Wikipedia");
+    model.canned = {
+      text: JSON.stringify({
+        rationale: "search",
+        anchors: [],
+        steps: [{ op: "click", role: "button", name: "Search" }],
+      }),
+    };
+    const server = await boot({ perception, actuation, models: model, occupancy });
+    const client = new TytoClient({ url: server.url, token: TOKEN });
+    await client.call("session.save", { session: emptySession("owl-1", "search wikipedia") });
+    await client.call("session.run", {
+      id: "owl-1",
+      frame: { tabId: "t", frameId: "main", origin: "https://en.wikipedia.org" },
+    });
+    expect(model.calls).toBe(1);
+    expect(actuation.performed).toHaveLength(1);
+    expect(actuation.performed[0]?.op).toBe("click");
+    expect(actuation.performed[0]?.node).toBe(43);
+    const opened = (await client.call("session.open", { id: "owl-1" })) as {
+      plan: { steps: Array<{ op: string }> } | null;
+    };
+    expect(opened.plan?.steps[0]?.op).toBe("click");
+  });
 });

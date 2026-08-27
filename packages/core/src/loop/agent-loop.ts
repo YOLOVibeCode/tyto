@@ -4,7 +4,7 @@ import type { Occupancy } from "../ports/occupancy.ts";
 import type { Redactor } from "../ports/redactor.ts";
 import type { SessionStore } from "../ports/session-store.ts";
 import { coercePlan } from "../plan/coerce.ts";
-import type { AxSnapshot, FrameRef, RefEntry, Session, TrustedIntent, Unsubscribe } from "../types.ts";
+import type { AxSnapshot, FrameRef, RefEntry, Session, Step, TrustedIntent, Unsubscribe } from "../types.ts";
 import { bind } from "../recipe/bind.ts";
 
 export type LoopPhase = "idle" | "thinking" | "acting";
@@ -22,6 +22,7 @@ export class AgentLoop {
   phase: LoopPhase = "idle";
   ephemeralRefs: Map<string, RefEntry> | null = null;
   private halted = false;
+  private pageGeneration: number | undefined;
   private readonly unsub: Unsubscribe;
 
   constructor(private readonly deps: LoopDeps) {
@@ -31,7 +32,22 @@ export class AgentLoop {
     });
   }
 
+  async play(session: Session, snap: AxSnapshot, frame: FrameRef): Promise<void> {
+    if (!this.canReplay(session, snap)) {
+      await this.think(session, snap);
+    }
+    while (isActable(session.remainingSteps[0])) {
+      const n = session.remainingSteps.length;
+      await this.act(session, snap, frame);
+      if (session.remainingSteps.length === n) break;
+    }
+  }
+
   async think(session: Session, snap: AxSnapshot): Promise<void> {
+    if (this.pageGeneration !== snap.generation) {
+      this.pageGeneration = snap.generation;
+      this.thinkCount = 0;
+    }
     if (this.shouldYield()) {
       this.phase = "idle";
       return;
@@ -65,7 +81,20 @@ export class AgentLoop {
       return;
     }
     const step = session.remainingSteps[0];
-    if (!step || step.op === "done" || step.op === "extract" || step.op === "press") {
+    if (!step || step.op === "done" || step.op === "extract") {
+      this.phase = "idle";
+      return;
+    }
+    if (step.op === "press") {
+      this.phase = "acting";
+      await this.deps.actuation.perform({ op: "press", key: step.key, frame });
+      if (this.shouldYield()) {
+        this.phase = "idle";
+        this.ephemeralRefs = null;
+        return;
+      }
+      session.remainingSteps = session.remainingSteps.slice(1);
+      await this.deps.store.save(session);
       this.phase = "idle";
       return;
     }
@@ -102,7 +131,22 @@ export class AgentLoop {
     this.unsub();
   }
 
+  /** Drop occupancy subscription without interrupting the operator. */
+  release(): void {
+    this.unsub();
+  }
+
   private shouldYield(): boolean {
     return this.halted || this.deps.occupancy.operatorActive();
   }
+
+  private canReplay(session: Session, snap: AxSnapshot): boolean {
+    const steps = session.remainingSteps;
+    if (steps.length === 0) return false;
+    return steps.every((s) => bind(s, snap) !== null);
+  }
+}
+
+function isActable(step: Step | undefined): boolean {
+  return step?.op === "click" || step?.op === "fill" || step?.op === "press";
 }

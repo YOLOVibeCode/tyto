@@ -1,9 +1,14 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { LoopbackBindPolicy, SecretRedactor, type BindPolicy } from "@tyto/core";
 import { RPC_ERROR, type JsonRpcId } from "@tyto/protocol";
-import { bearerMatches, headerValue } from "./auth.ts";
+import { headerValue, requestAuthorized } from "./auth.ts";
 import { dispatch, type DispatchPorts, type Runtime } from "./dispatch.ts";
 import { isJsonRpcRequest, readBody, RpcException, writeRpc, writeUnauthorized } from "./rpc.ts";
+
+const PERCH_HTML = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "perch.html"), "utf8");
 
 export type ListenConfig = DispatchPorts & {
   bind: string;
@@ -30,7 +35,7 @@ export async function listen(config: ListenConfig): Promise<HostServer> {
   const runtime: Runtime = { browser: undefined };
 
   const server = createServer((req, res) => {
-    void handleRpc(req, res, config.token, ports, runtime);
+    void handleRequest(req, res, config.token, ports, runtime);
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -66,6 +71,33 @@ export async function listen(config: ListenConfig): Promise<HostServer> {
   };
 }
 
+async function handleRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  token: string,
+  ports: DispatchPorts,
+  runtime: Runtime,
+): Promise<void> {
+  if (req.method === "GET" || req.method === "HEAD") {
+    servePerch(req, res, token);
+    return;
+  }
+  await handleRpc(req, res, token, ports, runtime);
+}
+
+function servePerch(req: IncomingMessage, res: ServerResponse, token: string): void {
+  res.statusCode = 200;
+  res.setHeader("content-type", "text/html; charset=utf-8");
+  res.setHeader("cache-control", "no-store");
+  res.setHeader("x-content-type-options", "nosniff");
+  res.setHeader("set-cookie", `tyto_at=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/`);
+  if (req.method === "HEAD") {
+    res.end();
+    return;
+  }
+  res.end(PERCH_HTML);
+}
+
 async function handleRpc(
   req: IncomingMessage,
   res: ServerResponse,
@@ -88,7 +120,7 @@ async function handleRpc(
   let id: JsonRpcId = null;
   try {
     const raw = await readBody(req);
-    if (!bearerMatches(headerValue(req.headers.authorization), token)) {
+    if (!requestAuthorized(headerValue(req.headers.authorization), headerValue(req.headers.cookie), token)) {
       writeUnauthorized(res, id);
       return;
     }

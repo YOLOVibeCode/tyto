@@ -7,10 +7,10 @@
   "exports": { ".": "./src/index.ts" },
   "dependencies": {
     "@tyto/core": "*",
-    "@tyto/protocol": "*"
-  },
-  "devDependencies": {
+    "@tyto/cdp": "*",
     "@tyto/fs": "*",
+    "@tyto/llm": "*",
+    "@tyto/protocol": "*",
     "@tyto/sdk": "*"
   }
 }

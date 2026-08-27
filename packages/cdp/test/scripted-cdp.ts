@@ -22,7 +22,10 @@ export class ScriptedCdp {
     if (
       method === "Input.dispatchMouseEvent" ||
       method === "DOM.scrollIntoViewIfNeeded" ||
-      method === "Target.setAutoAttach"
+      method === "Target.setAutoAttach" ||
+      method === "Page.enable" ||
+      method === "Page.navigate" ||
+      method === "Accessibility.enable"
     ) {
       return {};
     }

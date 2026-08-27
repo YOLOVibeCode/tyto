@@ -14,6 +14,7 @@ A [YOLOVibeCode](https://github.com/YOLOVibeCode) public repo. Product: Noctusof
 | | |
 |---|---|
 | Spec (use cases, security) | [docs/SPEC.md](./docs/SPEC.md) |
+| **How to run it** | [docs/USAGE.md](./docs/USAGE.md) |
 | Design | [docs/DESIGN.md](./docs/DESIGN.md) |
 | Implementation (TDD + ISP) | [docs/IMPLEMENTATION.md](./docs/IMPLEMENTATION.md) |
 | Agent rules | [AGENTS.md](./AGENTS.md) · [CLAUDE.md](./CLAUDE.md) · [`.cursor/rules`](./.cursor/rules/) |
@@ -150,35 +151,56 @@ auth material. No Kerberos TGT harvest, no impersonation, no export to scripts.
 
 ## Status
 
-**Slices 0–9 (contract) + 9b fakes are in-tree and tested** — including host
-JSON-RPC on loopback, model HTTP adapters (mocked), and CDP trusted-click /
-OOPIF contract tests on a scripted wire. Live Chrome (`TYTO_LIVE=1`), Perch UI,
-and the MV3 extension are specified; not product-complete yet. `poc/` is a
-Playwright spike used to prove AX + tape; it is not the product API.
+**Slices 0–9 (contract) + host Perch UI** are in-tree and tested — including host
+JSON-RPC on loopback, `GET /` Perch, model HTTP adapters (mocked), and CDP
+trusted-click / OOPIF contract tests on a scripted wire. Live Chrome spawn is
+`TYTO_LIVE=1` (`npm start`). The MV3 extension is specified; identity restore
+is not the first-run path. `poc/` is a Playwright spike used to prove AX + tape;
+it is not the product API.
 
 ---
 
-## Develop
+## Use it
 
-Requires **Node 22+**.
+There is **no packaged app** yet. You run the host from this repo. Opening
+Chrome from the Dock does not start Tyto.
+
+**Full walkthrough:** [docs/USAGE.md](./docs/USAGE.md).
 
 ```bash
 git clone git@github.com:YOLOVibeCode/tyto.git
 cd tyto
 git config core.hooksPath .githooks
 npm install
-npm test
+npm start
 ```
 
+`npm start` listens on `http://127.0.0.1:7420/` (Perch), launches Chrome with
+an **empty** Tyto profile (`~/.tyto/profile`), and opens the goal box. Paste a
+URL and a goal, click **Run**.
+
+You need Chrome or Edge, and a model at `TYTO_BASE_URL` (default Ollama
+`http://127.0.0.1:11434/v1`, model `gpt-oss:20b`). First start writes a host
+token into local `.env` (gitignored). Never commit it.
+
+Kill Perch: session JSON under `~/.tyto/sessions/` remains.
+
+---
+
+## Develop
+
+Requires **Node 22+**. Tests must pass **offline**.
+
 ```bash
+npm test
 npm run check          # imports + secrets + tests + types
 npm run secrets:scan   # fail closed; does not print secret values
 ```
 
 Copy `.env.example` to `.env` for local models. **Never commit `.env` or
-`tmp/` browser profiles.**
+browser profiles.** `npm test` never launches Chrome.
 
-Optional spike (installs Playwright locally):
+Optional spike (installs Playwright locally; not the product):
 
 ```bash
 npx playwright install chromium

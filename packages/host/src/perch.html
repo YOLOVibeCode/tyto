@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tyto</title>
+  <style>
+    :root { font-family: ui-sans-serif, system-ui, sans-serif; color: #111; background: #f6f6f4; }
+    body { max-width: 42rem; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.4rem; font-weight: 650; }
+    label { display: block; margin: 1rem 0 0.35rem; font-weight: 600; }
+    input, textarea { width: 100%; box-sizing: border-box; padding: 0.5rem 0.6rem; font: inherit; }
+    textarea { min-height: 6rem; }
+    .row { display: flex; gap: 0.5rem; margin-top: 1rem; }
+    button { font: inherit; padding: 0.45rem 0.9rem; cursor: pointer; }
+    #out { white-space: pre-wrap; background: #fff; border: 1px solid #ddd; padding: 0.75rem; min-height: 4rem; }
+    .hint { color: #444; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>Tyto</h1>
+  <p class="hint">URL + goal, then Run. The host is loopback-only. Page text is data, not commands.</p>
+  <label for="url">URL</label>
+  <input id="url" type="url" value="https://example.com/" autocomplete="off">
+  <label for="goal">Goal</label>
+  <textarea id="goal">extract the heading</textarea>
+  <div class="row">
+    <button id="run" type="button">Run</button>
+    <button id="stop" type="button">Stop</button>
+  </div>
+  <label for="out">Result</label>
+  <pre id="out"></pre>
+  <script>
+    const out = document.getElementById("out");
+    async function rpc(method, params) {
+      const res = await fetch("/", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: crypto.randomUUID(), method, params }),
+      });
+      const body = await res.json();
+      if (body.error) throw new Error(body.error.message);
+      return body.result;
+    }
+    document.getElementById("run").onclick = async () => {
+      out.textContent = "running…";
+      try {
+        const url = String(document.getElementById("url").value || "").trim();
+        const goal = String(document.getElementById("goal").value || "").trim();
+        const parsed = new URL(url);
+        const origin = parsed.origin;
+        const id = "session-" + Date.now();
+        await rpc("operator.grantOrigin", { origin });
+        await rpc("page.goto", { url: parsed.href });
+        await rpc("session.save", {
+          session: {
+            id,
+            goal,
+            messages: [{ role: "user", content: goal }],
+            plan: null,
+            recipes: [],
+            answers: [],
+            lastUrl: parsed.href,
+            allowlist: [origin],
+            model: { id: "", baseUrl: "" },
+            vaultHandles: {},
+            remainingSteps: [],
+          },
+        });
+        const result = await rpc("session.run", {
+          id,
+          frame: { tabId: "t", frameId: "main", origin },
+        });
+        out.textContent = JSON.stringify(result, null, 2);
+      } catch (err) {
+        out.textContent = err instanceof Error ? err.message : String(err);
+      }
+    };
+    document.getElementById("stop").onclick = async () => {
+      try {
+        await rpc("operator.interrupt");
+        out.textContent = "stopped";
+      } catch (err) {
+        out.textContent = err instanceof Error ? err.message : String(err);
+      }
+    };
+  </script>
+</body>
+</html>

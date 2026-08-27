@@ -41,6 +41,12 @@ describe("policy", () => {
     expect(new DefaultConfirmGate().mustConfirm({ kind: "click" })).toBeNull();
   });
 
+  it("identity capture / restore require confirm", () => {
+    const g = new DefaultConfirmGate();
+    expect(g.mustConfirm({ kind: "identity-capture" })).toBe("identity-capture");
+    expect(g.mustConfirm({ kind: "identity-restore" })).toBe("identity-restore");
+  });
+
   it("ProfileGuard throws if launch attempted without explicit pick when catalog is non-empty", () => {
     const g = new ExplicitProfileGuard(3);
     expect(() => g.assertExplicitPick({ browser: "chrome", directory: "", name: "" })).toThrow(/profile pick/);

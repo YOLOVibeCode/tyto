@@ -21,11 +21,13 @@ import type {
   ProfileCatalog,
   Readiness,
   Redactor,
+  Session,
   SessionStore,
   TrustedIntent,
 } from "@tyto/core";
-import { parseSession } from "@tyto/core";
+import { AgentLoop, parseSession } from "@tyto/core";
 import { isPerchSafeMethod, RPC_ERROR } from "@tyto/protocol";
+import { attachCdpAdapters } from "./attach-cdp.ts";
 import { record, RpcException } from "./rpc.ts";
 
 export type Runtime = {
@@ -74,10 +76,12 @@ export async function dispatch(
       return sessionSave(params, ports.sessions);
     case "session.list":
       return ports.sessions.list();
+    case "session.run":
+      return sessionRun(params, ports, signal);
     case "profiles.list":
       return profilesList(params, ports.profiles);
     case "browser.launch":
-      return browserLaunch(params, need(ports.launcher, "launcher"), runtime);
+      return browserLaunch(params, need(ports.launcher, "launcher"), runtime, ports);
     case "browser.disconnect":
       await runtime.browser?.disconnect();
       runtime.browser = undefined;
@@ -139,13 +143,53 @@ async function sessionSave(params: unknown, sessions: SessionStore): Promise<unk
   return { ok: true };
 }
 
+async function sessionRun(params: unknown, ports: DispatchPorts, signal: AbortSignal): Promise<unknown> {
+  if (signal.aborted) throw abortError(signal);
+  const id = String(record(params).id ?? "");
+  if (!id) throw new RpcException(RPC_ERROR.INVALID_PARAMS, "session.id required");
+  const session = await ports.sessions.load(id);
+  if (!session) throw new RpcException(RPC_ERROR.INVALID_PARAMS, "session not found");
+  const perception = need(ports.perception, "perception");
+  const actuation = need(ports.actuation, "actuation");
+  const model = need(ports.models, "models");
+  const occupancy = need(ports.occupancy, "occupancy");
+  const redactor = need(ports.redactor, "redactor");
+  const frame = runFrame(params, session);
+  const snap = await perception.snapshot(frame);
+  const loop = new AgentLoop({ store: ports.sessions, occupancy, actuation, model, redactor });
+  try {
+    await loop.play(session, snap, frame);
+  } finally {
+    loop.release();
+  }
+  return { ok: true };
+}
+
+function runFrame(params: unknown, session: Session): FrameRef {
+  const p = record(params);
+  if (p.frame !== undefined && p.frame !== null) return frameRef(params);
+  if (session.lastUrl) {
+    try {
+      return { tabId: "t", frameId: "main", origin: new URL(session.lastUrl).origin };
+    } catch {
+      // fall through
+    }
+  }
+  return { tabId: "t", frameId: "main", origin: "https://en.wikipedia.org" };
+}
+
 async function profilesList(params: unknown, profiles: ProfileCatalog | undefined): Promise<unknown> {
   if (!profiles) return [];
   const browser = record(params).browser === "edge" ? "edge" : "chrome";
   return profiles.list(browser);
 }
 
-async function browserLaunch(params: unknown, launcher: Launcher, runtime: Runtime): Promise<unknown> {
+async function browserLaunch(
+  params: unknown,
+  launcher: Launcher,
+  runtime: Runtime,
+  ports: DispatchPorts,
+): Promise<unknown> {
   const p = record(params);
   runtime.browser = await launcher.launch({
     browser: p.browser === "edge" ? "edge" : "chrome",
@@ -153,6 +197,7 @@ async function browserLaunch(params: unknown, launcher: Launcher, runtime: Runti
     port: Number(p.port ?? 0),
     bindHost: "127.0.0.1",
   });
+  attachCdpAdapters(runtime.browser, ports);
   return { ok: true };
 }
 

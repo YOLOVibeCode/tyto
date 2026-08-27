@@ -93,7 +93,17 @@ export type Step =
 export type Plan = { anchors: Array<{ id: string; role: string; name: string }>; steps: Step[]; rationale: string };
 
 export type Intent = {
-  kind: "click" | "fill" | "press" | "goto" | "submit" | "purchase" | "delete" | "send";
+  kind:
+    | "click"
+    | "fill"
+    | "press"
+    | "goto"
+    | "submit"
+    | "purchase"
+    | "delete"
+    | "send"
+    | "identity-capture"
+    | "identity-restore";
   url?: string;
   role?: string;
   name?: string;

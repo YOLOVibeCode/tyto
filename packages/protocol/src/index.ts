@@ -4,6 +4,7 @@ export const PERCH_SAFE_METHODS = [
   "session.open",
   "session.save",
   "session.list",
+  "session.run",
   "profiles.list",
   "browser.launch",
   "browser.disconnect",
