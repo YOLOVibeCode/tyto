@@ -5,48 +5,71 @@ export class CdpCredentialStore implements CredentialStorePort {
   constructor(private readonly wire: CdpWire) {}
 
   async readCookies(origin: Origin): Promise<RawCookie[]> {
-    const raw = await cdpCall(this.wire, "Network.getAllCookies", {}, undefined);
+    const raw = await this.readAllCookies();
     return cookiesFrom(raw).filter((c) => cookieMatchesOrigin(c.domain, origin));
   }
 
   async writeCookies(origin: Origin, cookies: RawCookie[]): Promise<void> {
     const url = origin.endsWith("/") ? origin : `${origin}/`;
-    for (const c of cookies) {
+    try {
       await cdpCall(
         this.wire,
-        "Network.setCookie",
+        "Storage.setCookies",
         {
-          name: c.name,
-          value: c.value,
-          domain: c.domain,
-          path: c.path,
-          httpOnly: c.httpOnly,
-          secure: c.secure,
-          url,
+          cookies: cookies.map((c) => ({
+            name: c.name,
+            value: c.value,
+            domain: c.domain,
+            path: c.path,
+            httpOnly: c.httpOnly,
+            secure: c.secure,
+            url,
+          })),
         },
         undefined,
       );
+    } catch {
+      for (const c of cookies) {
+        await cdpCall(
+          this.wire,
+          "Network.setCookie",
+          {
+            name: c.name,
+            value: c.value,
+            domain: c.domain,
+            path: c.path,
+            httpOnly: c.httpOnly,
+            secure: c.secure,
+            url,
+          },
+          undefined,
+        );
+      }
     }
   }
 
   async readStorage(origin: Origin): Promise<RawStorageItems> {
-    const local = await cdpCall(
-      this.wire,
-      "DOMStorage.getDOMStorageItems",
-      { storageId: { securityOrigin: origin, isLocalStorage: true } },
-      undefined,
-    );
-    const session = await cdpCall(
-      this.wire,
-      "DOMStorage.getDOMStorageItems",
-      { storageId: { securityOrigin: origin, isLocalStorage: false } },
-      undefined,
-    );
-    return {
-      localStorage: entriesToRecord(local),
-      sessionStorage: entriesToRecord(session),
-      indexedDb: {},
-    };
+    try {
+      const local = await cdpCall(
+        this.wire,
+        "DOMStorage.getDOMStorageItems",
+        { storageId: { securityOrigin: origin, isLocalStorage: true } },
+        undefined,
+      );
+      const session = await cdpCall(
+        this.wire,
+        "DOMStorage.getDOMStorageItems",
+        { storageId: { securityOrigin: origin, isLocalStorage: false } },
+        undefined,
+      );
+      return {
+        localStorage: entriesToRecord(local),
+        sessionStorage: entriesToRecord(session),
+        indexedDb: {},
+      };
+    } catch {
+      return { localStorage: {}, sessionStorage: {}, indexedDb: {} };
+    }
   }
 
   async writeStorage(origin: Origin, items: RawStorageItems): Promise<void> {
@@ -63,6 +86,14 @@ export class CdpCredentialStore implements CredentialStorePort {
         { name: c.name, domain: c.domain, path: c.path },
         undefined,
       );
+    }
+  }
+
+  private async readAllCookies(): Promise<unknown> {
+    try {
+      return await cdpCall(this.wire, "Storage.getCookies", {}, undefined);
+    } catch {
+      return await cdpCall(this.wire, "Network.getAllCookies", {}, undefined);
     }
   }
 }

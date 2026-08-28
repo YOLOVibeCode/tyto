@@ -63,10 +63,13 @@ export type ScriptedModelServer = {
   readonly port: number;
   readonly url: string;
   readonly baseUrl: string;
+  /** Raw request bodies received by POST /v1/chat/completions (for redaction grep). */
+  readonly prompts: string[];
   close(): Promise<void>;
 };
 
 export async function startScriptedModel(): Promise<ScriptedModelServer> {
+  const prompts: string[] = [];
   const server: Server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
 
@@ -89,6 +92,7 @@ export async function startScriptedModel(): Promise<ScriptedModelServer> {
         body += String(chunk);
       });
       req.on("end", () => {
+        prompts.push(body);
         let parsed: { messages?: Array<{ role: string; content: string }> } = {};
         try {
           parsed = JSON.parse(body) as typeof parsed;
@@ -136,6 +140,7 @@ export async function startScriptedModel(): Promise<ScriptedModelServer> {
     port,
     url: `http://127.0.0.1:${port}`,
     baseUrl,
+    prompts,
     close: () =>
       new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));

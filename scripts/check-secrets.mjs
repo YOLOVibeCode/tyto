@@ -31,7 +31,8 @@ const PATTERNS = [
 
 const ALLOW_PATH = [
   /packages\/core\/src\/identity\/redact\.ts$/,
-  /packages\/core\/test\//,
+  /\/test\//,
+  /e2e\//,
   /scripts\/check-secrets\.mjs$/,
   /\.md$/,
 ];

@@ -172,4 +172,27 @@ describe("host kernel", () => {
     };
     expect(opened.plan?.steps[0]?.op).toBe("click");
   });
+
+  it("models.complete: Redactor.prompt strips Cookie value before ModelPort.complete", async () => {
+    const models = new FakeModel();
+    const server = await boot({ models });
+    const client = new TytoClient({ url: server.url, token: TOKEN });
+    await client.call("models.complete", {
+      system: "plan",
+      user: "Cookie: sessionid=supersecretcookievalue99",
+    });
+    expect(models.last?.user).not.toContain("supersecretcookievalue99");
+    expect(models.last?.user).toContain("[REDACTED]");
+  });
+
+  it("tape.recent: Set-Cookie header is redacted before return", async () => {
+    const observation = new FakeObservation();
+    observation.push("network", "Set-Cookie: sessionid=abc123xyz999; Path=/");
+    const server = await boot({ observation });
+    const client = new TytoClient({ url: server.url, token: TOKEN });
+    const events = (await client.call("tape.recent", { n: 5 })) as Array<{ detail: string }>;
+    const joined = events.map((e) => e.detail).join("\n");
+    expect(joined).not.toContain("abc123xyz999");
+    expect(joined).toContain("[REDACTED]");
+  });
 });

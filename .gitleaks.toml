@@ -38,7 +38,9 @@ paths = [
   '''docs/''',
   '''.*\.md$''',
   '''packages/core/src/identity/redact\.ts$''',
-  '''packages/core/test/''',
+  '''packages/.*/test/''',
+  '''extension/test/''',
+  '''e2e/''',
   '''scripts/check-secrets\.mjs$''',
   '''\.gitleaks\.toml$''',
 ]

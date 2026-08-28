@@ -2,7 +2,78 @@
  * Loopback HTTP server that serves deterministic fixture pages for e2e tests.
  * All pages are self-contained; no external assets or scripts.
  */
-import { createServer, type Server } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse, type Server } from "node:http";
+
+/** HttpOnly session cookie for the vault live fixture. Never rendered in HTML. */
+export const VAULT_SESSION_COOKIE = "e2e_sid";
+export const VAULT_SESSION_VALUE = "e2e-vault-session-k9f3m2x8q1w7p4n6";
+
+const SET_COOKIE = `${VAULT_SESSION_COOKIE}=${VAULT_SESSION_VALUE}; Path=/; HttpOnly; SameSite=Lax`;
+
+const LOGIN_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Fixture Login</title></head>
+<body>
+  <h1>Sign in</h1>
+  <form method="post" action="/login">
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password">
+    <button type="submit">Sign in</button>
+  </form>
+</body>
+</html>`;
+
+const ACCOUNT_OK_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Fixture Account</title></head>
+<body>
+  <h1>Account</h1>
+  <p>Welcome, operator. You are signed in.</p>
+</body>
+</html>`;
+
+const ACCOUNT_DENIED_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Fixture Account</title></head>
+<body>
+  <h1>Account</h1>
+  <p>Please log in.</p>
+</body>
+</html>`;
+
+function hasVaultSession(req: IncomingMessage): boolean {
+  const header = req.headers.cookie ?? "";
+  return header.split(";").some((part) => part.trim() === `${VAULT_SESSION_COOKIE}=${VAULT_SESSION_VALUE}`);
+}
+
+function handleVaultRoute(req: IncomingMessage, res: ServerResponse, path: string): boolean {
+  if (path === "/login.html") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+    res.end(LOGIN_HTML);
+    return true;
+  }
+  if (path === "/session/grant") {
+    res.writeHead(302, { "set-cookie": SET_COOKIE, location: "/account" });
+    res.end();
+    return true;
+  }
+  if (path === "/login" && req.method === "POST") {
+    res.writeHead(302, { "set-cookie": SET_COOKIE, location: "/account" });
+    res.end();
+    return true;
+  }
+  if (path === "/account") {
+    if (hasVaultSession(req)) {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+      res.end(ACCOUNT_OK_HTML);
+    } else {
+      res.writeHead(401, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+      res.end(ACCOUNT_DENIED_HTML);
+    }
+    return true;
+  }
+  return false;
+}
 
 const PAGES: Record<string, string> = {
   "/search.html": `<!DOCTYPE html>
@@ -60,6 +131,7 @@ export type FixtureServer = {
 export async function startFixtureServer(): Promise<FixtureServer> {
   const server: Server = createServer((req, res) => {
     const path = new URL(req.url ?? "/", "http://localhost").pathname;
+    if (handleVaultRoute(req, res, path)) return;
     const html = PAGES[path] ?? PAGES["/result.html"]!;
     res.writeHead(200, {
       "content-type": "text/html; charset=utf-8",

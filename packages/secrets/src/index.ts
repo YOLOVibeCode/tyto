@@ -68,9 +68,14 @@ export class MemoryIdentityVault implements IdentityVault {
   constructor(
     private readonly secrets: SecretStore,
     private readonly allow: Allowlist | Set<Origin>,
-    private readonly creds: CredentialStorePort,
+    private creds: CredentialStorePort,
     private readonly opts: VaultOpts = {},
   ) {}
+
+  /** After LAUNCH reconnect, point restore at the new browser's credential store. */
+  bindCredentialStore(creds: CredentialStorePort): void {
+    this.creds = creds;
+  }
 
   private clock(): Clock {
     return this.opts.clock ?? { now: () => Date.now(), sleep: async () => undefined };

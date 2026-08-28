@@ -14,14 +14,14 @@ const SESSION = {
 };
 
 describe("CDP CredentialStorePort", () => {
-  it("readCookies uses Network.getAllCookies, never document.cookie / Runtime.evaluate", async () => {
+  it("readCookies uses Storage.getCookies, never document.cookie / Runtime.evaluate", async () => {
     const wire = new ScriptedCdp();
-    wire.handlers.set("Network.getAllCookies", () => ({
+    wire.handlers.set("Storage.getCookies", () => ({
       cookies: [SESSION, { ...SESSION, name: "x", domain: "evil.test", value: "nope" }],
     }));
     const store = new CdpCredentialStore(wire);
     const cookies = await store.readCookies(ORIGIN);
-    expect(wire.calls.map((c) => c.method)).toEqual(["Network.getAllCookies"]);
+    expect(wire.calls.map((c) => c.method)).toEqual(["Storage.getCookies"]);
     expect(JSON.stringify(wire.calls)).not.toMatch(/Runtime\.evaluate|document\.cookie/);
     expect(cookies).toHaveLength(1);
     expect(cookies[0]?.name).toBe("sessionid");
@@ -29,19 +29,39 @@ describe("CDP CredentialStorePort", () => {
     expect(cookies.some((c) => c.domain.includes("evil"))).toBe(false);
   });
 
-  it("writeCookies uses Network.setCookie; does not Runtime.evaluate", async () => {
+  it("readCookies: Storage.getCookies missing falls back to Network.getAllCookies", async () => {
+    const wire = new ScriptedCdp();
+    wire.handlers.set("Network.getAllCookies", () => ({ cookies: [SESSION] }));
+    const store = new CdpCredentialStore(wire);
+    const cookies = await store.readCookies(ORIGIN);
+    expect(wire.calls.map((c) => c.method)).toEqual(["Storage.getCookies", "Network.getAllCookies"]);
+    expect(cookies).toHaveLength(1);
+  });
+
+  it("writeCookies uses Storage.setCookies; does not Runtime.evaluate", async () => {
+    const wire = new ScriptedCdp();
+    wire.handlers.set("Storage.setCookies", () => ({}));
+    const store = new CdpCredentialStore(wire);
+    await store.writeCookies(ORIGIN, [SESSION]);
+    expect(wire.calls.map((c) => c.method)).toEqual(["Storage.setCookies"]);
+    expect(wire.calls[0]?.params).toMatchObject({
+      cookies: [{ name: "sessionid", domain: "hr.example.edu", httpOnly: true, secure: true }],
+    });
+    expect(JSON.stringify(wire.calls)).not.toMatch(/Runtime\.evaluate|document\.cookie/);
+  });
+
+  it("writeCookies: Storage.setCookies missing falls back to Network.setCookie", async () => {
     const wire = new ScriptedCdp();
     wire.handlers.set("Network.setCookie", () => true);
     const store = new CdpCredentialStore(wire);
     await store.writeCookies(ORIGIN, [SESSION]);
-    expect(wire.calls.map((c) => c.method)).toEqual(["Network.setCookie"]);
-    expect(wire.calls[0]?.params).toMatchObject({
+    expect(wire.calls.map((c) => c.method)).toEqual(["Storage.setCookies", "Network.setCookie"]);
+    expect(wire.calls[1]?.params).toMatchObject({
       name: "sessionid",
       domain: "hr.example.edu",
       httpOnly: true,
       secure: true,
     });
-    expect(JSON.stringify(wire.calls)).not.toMatch(/Runtime\.evaluate|document\.cookie/);
   });
 
   it("readStorage reads localStorage and sessionStorage via DOMStorage", async () => {
@@ -77,6 +97,14 @@ describe("CDP CredentialStorePort", () => {
       (c) => (c.params as { storageId?: { isLocalStorage?: boolean } }).storageId?.isLocalStorage,
     );
     expect(local?.params).toMatchObject({ key: "k", value: "v" });
+  });
+
+  it("readStorage: DOMStorage failure yields empty maps, does not throw", async () => {
+    const wire = new ScriptedCdp();
+    const store = new CdpCredentialStore(wire);
+    const items = await store.readStorage(ORIGIN);
+    expect(items).toEqual({ localStorage: {}, sessionStorage: {}, indexedDb: {} });
+    expect(wire.calls.some((c) => c.method === "Runtime.evaluate")).toBe(false);
   });
 
   it("clearCookies deletes only that origin's cookies", async () => {

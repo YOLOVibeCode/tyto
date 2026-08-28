@@ -261,16 +261,27 @@ actually navigated — without trusting the code under test.
 
 Requires Chrome on `PATH` and `TYTO_E2E=1 TYTO_LIVE=1`.
 
+`e2e/test/vault-live.test.ts` is the same gate. It logs into a cookie-session fixture,
+captures via `CdpCredentialStore` + the identity vault, quits Chrome, relaunches an
+empty profile, restores, and checks the account page is still authenticated. It then
+greps the session file, tape, model prompt, and vault ciphertext for the cookie value.
+
 ### Tier 3 — Extension panel (opt-in, Playwright)
 
 `e2e/test/extension-panel.test.ts` uses `chromium.launchPersistentContext` with
-`--load-extension=extension/` to run the real extension. An in-process host (with fakes
-+ scripted model) is started. The host token is seeded into `chrome.storage.session` via
-the service worker. Playwright then drives `sidepanel.html` as a tab.
+`--load-extension=extension/` to run the real extension. Playwright Chromium must run
+**headed** (`headless: false`) — extensions do not register a service worker in
+headless mode. On macOS that opens a brief window; on CI the job wraps the run in
+`xvfb-run`.
+
+The host token is seeded into `chrome.storage.session` via the service worker.
+Playwright intercepts extension→host HTTP with `context.route()` (Playwright
+Chromium blocks service-worker `fetch` to loopback). Then it drives `sidepanel.html`
+as a tab.
 
 Playwright's role is strictly the operator's finger on the panel DOM. Page actuation
 stays Tyto's. The test asserts: model dropdown populated, goal send → assistant reply
-visible, token absent from DOM.
+visible, token absent from DOM, origin not auto-granted on panel load.
 
 Requires `TYTO_E2E=1`.
 
@@ -286,4 +297,5 @@ Requires `TYTO_MODEL_LIVE=1` (plus Ollama running with `TYTO_BASE_URL` + `TYTO_M
 
 `.github/workflows/ci.yml` — airplane-mode check, runs on every push / PR.
 `.github/workflows/e2e.yml` — Tiers 2–3, nightly + `workflow_dispatch`, marked
-`continue-on-error: true`. Not required for merge.
+`continue-on-error: true`. Not required for merge. Tier 3 runs under `xvfb-run`
+because the extension test needs a display.

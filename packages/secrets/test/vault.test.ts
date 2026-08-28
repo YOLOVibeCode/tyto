@@ -30,6 +30,32 @@ describe("MemoryIdentityVault", () => {
     expect(creds.cookies.get(origin)?.[0]?.value).toBe("supersecretcookievalue");
   });
 
+  it("bindCredentialStore: restore writes into the newly bound store", async () => {
+    const origin = "https://ex.test";
+    const cookies = [
+      {
+        name: "sessionid",
+        value: "supersecretcookievalue",
+        domain: "ex.test",
+        path: "/",
+        httpOnly: true,
+        secure: true,
+      },
+    ];
+    const empty = { localStorage: {}, sessionStorage: {}, indexedDb: {} };
+    const first = new FakeCredentialStore();
+    first.seed(origin, cookies, empty);
+    const allow = new OriginAllowlist();
+    allow.grant(origin);
+    const vault = new MemoryIdentityVault(new MemorySecretStore(), allow, first);
+    await vault.capture(origin);
+    const second = new FakeCredentialStore();
+    vault.bindCredentialStore(second);
+    await vault.restore(origin);
+    expect(second.cookies.get(origin)?.[0]?.value).toBe("supersecretcookievalue");
+    expect(first.writeCookieCalls).toHaveLength(0);
+  });
+
   it("capture on a not-granted origin is refused", async () => {
     const vault = new MemoryIdentityVault(
       new MemorySecretStore(),

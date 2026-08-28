@@ -34,12 +34,12 @@ jobs:
         with:
           chrome-version: stable
 
-      - name: Run live loop tests (Tier 2)
+      - name: Run live loop + vault tests (Tier 2)
         env:
           TYTO_E2E: "1"
           TYTO_LIVE: "1"
           TYTO_HOST_TOKEN: ${{ secrets.TYTO_E2E_TOKEN || 'e2e-ci-token-placeholder-32ch' }}
-        run: npx vitest run --config e2e/vitest.config.ts --reporter=verbose e2e/test/live-loop.test.ts
+        run: npx vitest run --config e2e/vitest.config.ts --reporter=verbose e2e/test/live-loop.test.ts e2e/test/vault-live.test.ts
 
   extension-panel:
     name: "Tier 3 — extension panel (Playwright)"
@@ -56,7 +56,11 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install chromium --with-deps
 
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Run extension panel tests (Tier 3)
         env:
           TYTO_E2E: "1"
-        run: npx vitest run --config e2e/vitest.config.ts --reporter=verbose e2e/test/extension-panel.test.ts
+        # Extensions require a display (headless: false). xvfb provides one on CI.
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" npx vitest run --config e2e/vitest.config.ts --reporter=verbose e2e/test/extension-panel.test.ts

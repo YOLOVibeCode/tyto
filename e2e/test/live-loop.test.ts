@@ -17,9 +17,10 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { freeLoopbackPort, bootLive } from "@tyto/host";
 import { TytoClient } from "@tyto/sdk";
-import { connectCdp, openLoopbackWebSocket, CdpLauncher, spawnBrowser } from "@tyto/cdp";
+import { connectCdp, openLoopbackWebSocket } from "@tyto/cdp";
 import { parseSession } from "@tyto/core";
 import { startFixtureServer, type FixtureServer } from "../src/fixture-server.ts";
+import { e2eLauncher, ensureLiveSpawn } from "../src/live-chrome.ts";
 import { startScriptedModel, type ScriptedModelServer } from "../src/scripted-model.ts";
 
 const LIVE = process.env.TYTO_E2E === "1" && process.env.TYTO_LIVE === "1";
@@ -56,18 +57,9 @@ describe.skipIf(!LIVE)("live loop — Tyto drives its own fixture pages", () => 
     };
 
     // spawnBrowser reads process.env.TYTO_LIVE directly; set it for the launcher
-    process.env.TYTO_LIVE = "1";
+    ensureLiveSpawn();
 
-    // Use a headless launcher with a longer pause so Chrome's CDP server has time to come up.
-    // Default waitForJsonVersion timeout is 40 × 50ms = 2s; Chrome on macOS needs ~4s.
-    // Multiplying pause by 6 gives 40 × 300ms = 12s — enough headroom.
-    const e2eLauncher = new CdpLauncher({
-      spawn: (binary, args) =>
-        spawnBrowser(binary, [...args, "--headless=new", "--disable-gpu", "--disable-extensions"]),
-      pause: (ms) => new Promise((resolve) => setTimeout(resolve, ms * 6)),
-    });
-
-    const server = await bootLive(env, { launcher: e2eLauncher });
+    const server = await bootLive(env, { launcher: e2eLauncher() });
     hostUrl = server.url;
     closeHost = () => server.close();
   });
