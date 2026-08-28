@@ -31,7 +31,7 @@ describe("out of the box host", () => {
     const html = await res.text();
     const cookie = res.headers.get("set-cookie") ?? "";
     expect(res.headers.get("content-type")).toMatch(/text\/html/);
-    expect(html).toContain("Run");
+    expect(html).toContain("Send");
     expect(html).toContain("operator.grantOrigin");
     expect(html).toContain("session.run");
     expect(html).not.toContain(TOKEN);
@@ -116,7 +116,7 @@ describe("out of the box host", () => {
     expect(launches[0]?.userDataDir).toBe(dir);
     expect(launches[0]?.port).toBe(9333);
     const html = await (await fetch(server.url)).text();
-    expect(html).toContain("Run");
+    expect(html).toContain("Send");
     const client = new TytoClient({ url: server.url, token: TOKEN });
     await expect(client.call("session.list")).resolves.toEqual([]);
   });

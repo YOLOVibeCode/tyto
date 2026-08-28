@@ -45,6 +45,8 @@ export function composeFromEnv(
   } catch {
     throw new Error("TYTO_BASE_URL invalid");
   }
+  const apiKey = env.TYTO_API_KEY ?? "";
+  const defaultModel = env.TYTO_MODEL ?? "gpt-oss:20b";
   const config: ListenConfig = {
     bind,
     token,
@@ -54,11 +56,11 @@ export function composeFromEnv(
     occupancy: new IdleOccupancy(),
     launcher: new CdpLauncher(),
     observation: new MemoryTape(),
-    models: new OpenAiCompatModel({
-      baseUrl,
-      apiKey: env.TYTO_API_KEY ?? "",
-      model: env.TYTO_MODEL ?? "gpt-oss:20b",
-    }),
+    models: new OpenAiCompatModel({ baseUrl, apiKey, model: defaultModel }),
+    modelBaseUrl: baseUrl,
+    modelApiKey: apiKey,
+    modelResolver: (id: string) =>
+      new OpenAiCompatModel({ baseUrl, apiKey, model: id }),
     catalog: new OpenAiCatalog(),
     extractor: {
       fromAx(snap, query) {

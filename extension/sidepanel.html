@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tyto</title>
+  <style>
+    :root { font-family: ui-sans-serif, system-ui, sans-serif; color: #111; background: #f6f6f4; --r: #c62828; }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+
+    /* ── header ─────────────────────────────────────────────────── */
+    header {
+      display: flex; align-items: center; gap: 0.4rem;
+      padding: 0.5rem 0.6rem;
+      border-bottom: 1px solid #ddd;
+      flex-shrink: 0;
+      background: #fff;
+    }
+    header h1 { font-size: 1rem; font-weight: 700; margin: 0; }
+    .scope { display: flex; gap: 0.25rem; margin-left: auto; }
+    .scope button {
+      font: 0.78rem inherit; padding: 0.2rem 0.5rem;
+      border: 1px solid #ccc; border-radius: 12px;
+      background: #fff; cursor: pointer; color: #444;
+    }
+    .scope button.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+    select { font: inherit; padding: 0.22rem 0.35rem; border: 1px solid #ccc; border-radius: 4px; background: #fff; }
+    #model { max-width: 9rem; font-size: 0.82rem; }
+
+    /* ── transcript ──────────────────────────────────────────────── */
+    #transcript {
+      flex: 1; overflow-y: auto;
+      padding: 0.6rem;
+      display: flex; flex-direction: column; gap: 0.4rem;
+    }
+    .msg { display: flex; flex-direction: column; gap: 0.1rem; }
+    .msg .label { font-size: 0.7rem; font-weight: 600; color: #777; text-transform: uppercase; letter-spacing: 0.04em; }
+    .msg .bubble {
+      background: #fff; border: 1px solid #ddd; border-radius: 8px;
+      padding: 0.45rem 0.6rem; white-space: pre-wrap; font-size: 0.88rem;
+    }
+    .msg.assistant .bubble { background: #eef4ff; border-color: #c3d4f5; }
+    #placeholder { color: #888; font-size: 0.88rem; text-align: center; margin: auto; padding: 1rem; }
+
+    /* ── status ──────────────────────────────────────────────────── */
+    #status { font-size: 0.78rem; color: #666; padding: 0.1rem 0.6rem; min-height: 1.1em; flex-shrink: 0; }
+
+    /* ── composer ─────────────────────────────────────────────────── */
+    footer {
+      display: flex; gap: 0.35rem; align-items: flex-end;
+      padding: 0.4rem 0.6rem 0.5rem;
+      border-top: 1px solid #ddd;
+      flex-shrink: 0;
+      background: #f6f6f4;
+    }
+    #compose {
+      flex: 1; font: inherit; font-size: 0.88rem;
+      padding: 0.4rem 0.5rem;
+      border: 1px solid #ccc; border-radius: 6px;
+      resize: none; min-height: 2.4rem; max-height: 8rem;
+    }
+    #send {
+      font: inherit; font-size: 0.88rem;
+      padding: 0.4rem 0.75rem; cursor: pointer;
+      border: 1px solid #1a1a1a; border-radius: 6px;
+      background: #1a1a1a; color: #fff;
+    }
+    #send:disabled { opacity: 0.4; }
+    #stop {
+      font: inherit; font-size: 0.88rem;
+      padding: 0.4rem 0.6rem; cursor: pointer;
+      border: 1px solid var(--r); border-radius: 6px;
+      background: #fff; color: var(--r);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Tyto</h1>
+    <select id="model" title="Model"><option value="">loading…</option></select>
+    <div class="scope">
+      <button id="scope-tab" class="active" title="Act on this tab only">This tab</button>
+      <button id="scope-all" title="Act on the focused tab (all tabs)">All tabs</button>
+    </div>
+  </header>
+
+  <div id="transcript">
+    <div id="placeholder">Enter a goal below and press Send.</div>
+  </div>
+
+  <div id="status"></div>
+
+  <footer>
+    <textarea id="compose" rows="1" placeholder="Goal or message…"></textarea>
+    <button id="send" type="button">Send</button>
+    <button id="stop" type="button" title="Interrupt">Stop</button>
+  </footer>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

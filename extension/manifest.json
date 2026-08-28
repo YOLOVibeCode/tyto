@@ -2,8 +2,10 @@
   "manifest_version": 3,
   "name": "Tyto",
   "version": "0.1.0",
-  "description": "ATTACH mode: auto debugger + native messaging to the Tyto host. The page cannot command Tyto.",
-  "permissions": ["nativeMessaging", "debugger", "tabs"],
+  "description": "AI browser control — side panel + ATTACH mode. The page cannot command Tyto.",
+  "permissions": ["nativeMessaging", "debugger", "tabs", "storage", "sidePanel"],
   "host_permissions": [],
-  "background": { "service_worker": "background.js", "type": "module" }
+  "background": { "service_worker": "background.js", "type": "module" },
+  "side_panel": { "default_path": "sidepanel.html" },
+  "action": {}
 }

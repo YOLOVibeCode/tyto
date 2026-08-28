@@ -16,7 +16,7 @@ Operator contract: [SPEC.md](./SPEC.md). This file is the current start path.
 
 | Window | What it is |
 |---|---|
-| Perch at `http://127.0.0.1:7420/` | URL, goal, **Run** / **Stop**. This is the steering wheel. |
+| Perch at `http://127.0.0.1:7420/` | Chat composer, model picker, **Stop**. The steering wheel. |
 | Chrome (empty Tyto profile) | The hands. Pages load and clicks happen here. |
 
 They are not the same window. Perch is usually your default browser; Chrome is
@@ -73,27 +73,27 @@ Do not commit `.env`. Do not paste the token into chat or tickets.
 
 1. Start the model (Ollama or your proxy).
 2. From the repo: `npm start`.
-3. In **Perch**:
-   - **URL** — page to open (must be `http:` or `https:`). Example:
-     `https://example.com/`
-   - **Goal** — what you want in prose. Example: `extract the heading`
-   - **Run**
-4. Watch the Tyto Chrome window. You can type or click in that window at any
-   time; Tyto is supposed to yield.
-5. **Stop** asks the host to interrupt.
-6. In the terminal: Ctrl+C stops the host (Chrome child is torn down with the
-   session’s debug process).
+3. In **Perch** (`http://127.0.0.1:7420/`):
+   - **Model** dropdown — pick from the host catalog (populated on load from
+     `models.list`; shows "unavailable" if the host is not running or the catalog
+     endpoint is down).
+   - **Go bar** — paste a URL and click **Go** to navigate the launched Chrome
+     and start a session. The origin is granted automatically.
+   - **Composer** — type a follow-up goal or message and press **Send** (or
+     Enter). Shift+Enter inserts a newline.
+4. Watch the Tyto Chrome window. You can type or click there at any time; Tyto
+   yields to operator input.
+5. **Stop** asks the host to interrupt the running session.
+6. In the terminal: Ctrl+C stops the host.
 
-**Run** does this, in order:
+**Go** does this, in order:
 
-1. Grant **that URL’s origin** on the session allowlist (default-deny otherwise)
+1. Grant **that URL's origin** on the session allowlist (default-deny otherwise)
 2. `page.goto` in the launched Chrome
-3. Save a prompt session on disk
+3. Save a prompt session on disk with the selected model id
 4. `session.run` — snapshot the accessibility tree, plan, trusted clicks
 
 It does **not** grant every origin a page happens to load (iframes, SSO popups).
-Grant those separately when we expose that in the UI; until then, stay on
-simple top-level pages for first runs.
 
 ---
 
@@ -103,7 +103,7 @@ simple top-level pages for first runs.
 |---|---|
 | `./.env` (repo cwd) | Host token and optional model settings. Gitignored. |
 | `~/.tyto/profile/` | Chrome/Edge user-data-dir for the launched window (empty on first run). |
-| `~/.tyto/sessions/` | Prompt session JSON (goal, plan, last URL). This is the durable object. |
+| `~/.tyto/sessions/` | Prompt session JSON (goal, plan, last URL, model id). This is the durable object. |
 
 Resume later: `npm start` again, then continue from the same session files.
 Killing Perch does not delete them.
@@ -117,7 +117,7 @@ All optional except a host token (generated on first `npm start`).
 | Variable | Default | Role |
 |---|---|---|
 | `TYTO_BASE_URL` | `http://127.0.0.1:11434/v1` | OpenAI-compatible `/v1` |
-| `TYTO_MODEL` | `gpt-oss:20b` | Model id at that base URL |
+| `TYTO_MODEL` | `gpt-oss:20b` | Default model id when session has none |
 | `TYTO_API_KEY` | empty | Sent as Bearer if set |
 | `TYTO_HOST_TOKEN` | generated | Loopback RPC auth; never log it |
 | `TYTO_BIND` | `127.0.0.1` | Host bind. `0.0.0.0` is refused |
@@ -138,23 +138,81 @@ All optional except a host token (generated on first `npm start`).
 | `browser binary not found` | Chrome/Edge not installed where Tyto looks |
 | `browser spawn is opt-in` | You did not use `npm start` (that sets `TYTO_LIVE=1`) |
 | `EADDRINUSE` / listen error on 7420 | Another Tyto (or process) on `TYTO_PORT` |
-| Perch loads, **Run** says model HTTP error | Ollama/proxy down, wrong `TYTO_MODEL`, or `TYTO_BASE_URL` |
-| `origin not allowed` | Allowlist default-deny; use **Run** from Perch so the typed URL is granted |
-| `browser not launched` | Host up but Launch failed; check the terminal from `npm start` |
-| Empty snapshot / nothing clicks | Model returned no usable plan, or the page is a shell/iframe you have not granted |
+| Model dropdown shows "unavailable" | Ollama/proxy down, or wrong `TYTO_BASE_URL` |
+| Perch loads, **Go** says model HTTP error | Wrong `TYTO_MODEL`, or model not pulled in Ollama |
+| `origin not allowed` | Allowlist default-deny; use **Go** from Perch so the typed URL is granted |
+| `browser not launched` | Host up but launch failed; check the terminal from `npm start` |
+| Empty snapshot / nothing clicks | Model returned no usable plan, or page is a shell/iframe you have not granted |
 
 `npm test` is airplane-mode. It never launches Chrome and never needs API keys.
 A green `npm test` does not prove live Chrome.
 
 ---
 
+## Chrome / Edge side panel (extension)
+
+The Tyto extension adds a **side panel** (like Claude's sidebar) to Chrome or
+Edge. It talks to the running host over loopback — no CDP from the page, no
+`window.tyto`, token never in the panel DOM.
+
+### Load the extension (unpacked)
+
+1. Open `chrome://extensions` (or `edge://extensions`).
+2. Enable **Developer mode** (top-right toggle).
+3. Click **Load unpacked**.
+4. Select the `extension/` folder inside your Tyto checkout.
+
+### Store the host token in the extension
+
+The extension reads the host token from `chrome.storage.session`. Set it once
+after each browser restart (the host token is in `.env` as `TYTO_HOST_TOKEN`):
+
+Open the Chrome DevTools console on any extension page, then run:
+
+```js
+chrome.storage.session.set({ hostToken: "YOUR_TOKEN", hostPort: "7420" });
+```
+
+Replace `YOUR_TOKEN` with the value from `.env`. **Never commit it.**
+
+### Open the side panel
+
+Click the **Tyto** toolbar icon. The panel appears on the right side of the
+window. If it does not appear, ensure the host (`npm start`) is running first.
+
+### Pick a model
+
+The **Model** dropdown is populated from `models.list` (the host catalog —
+models at `TYTO_BASE_URL`). Select the model you want; the choice persists
+in `chrome.storage.local`. If the dropdown shows "unavailable", the host is
+not running or the catalog endpoint returned an error.
+
+### Send a goal
+
+Type your goal in the composer at the bottom and press **Send** (or Enter).
+Shift+Enter inserts a newline. The transcript shows your message and Tyto's reply.
+
+### Scope: This tab vs All tabs
+
+| Button | Behaviour |
+|---|---|
+| **This tab** (default) | Panel scoped to the current tab via `setOptions({ tabId })`. |
+| **All tabs** | Global panel stays open across tabs. Tyto acts on whichever tab is focused when you send. |
+
+The last scope choice is persisted in `chrome.storage.local`.
+
+### Stop
+
+**Stop** sends `operator.interrupt` to the running session.
+
+---
+
 ## What this is not (yet)
 
 - A packaged `Tyto.app` / Windows installer
-- “Open my normal Chrome and Tyto is already in it” (that is **ATTACH**,
-  extension + native messaging)
+- "Open my normal Chrome and Tyto is already in it" (ATTACH via `chrome.debugger`
+  auto-attach -- Slice 11; the panel today talks to the LAUNCH host)
 - Automatic clone of your named Chrome/Edge profile (explicit pick, later)
-- Perch as a Chrome side panel (same SDK client; still a later view)
 - Identity vault restore into the first-run profile
 
 Those are specified. They are not the current start path.
@@ -164,9 +222,68 @@ Those are specified. They are not the current start path.
 ## Developers
 
 ```bash
-npm test           # offline
+npm test           # offline, always airplane-mode
 npm run check      # imports + secrets scan + tests + types
+npm run test:e2e   # live E2E: requires Chrome on PATH (sets TYTO_E2E=1 TYTO_LIVE=1)
 ```
 
 Product laws: [IMPLEMENTATION.md](./IMPLEMENTATION.md). Do not promote `poc/`
 (Playwright spike) into product packages.
+
+---
+
+## Testing tiers
+
+Tyto uses four test tiers. Only Tier 1 gates merges.
+
+| Tier | What | Gate | Command |
+|---|---|---|---|
+| 1 | JSDOM UI (perch.html + sidepanel.js) | ✅ Merge-gating | `npm test` |
+| 2 | Live loop — Tyto drives real Chrome | `TYTO_E2E=1 TYTO_LIVE=1` | `npm run test:e2e` |
+| 3 | Playwright extension side-panel DOM | `TYTO_E2E=1` | `npm run test:e2e` |
+| 4 | Ollama nightly — real model round-trip | `TYTO_MODEL_LIVE=1` | `TYTO_MODEL_LIVE=1 npm run test:e2e` |
+
+### Tier 1 — JSDOM (offline, gating)
+
+Tests in `packages/host/test/perch-ui.test.ts` and `extension/test/sidepanel-ui.test.ts`
+load `perch.html` and `sidepanel.js` into JSDOM, stub `fetch` / `chrome.*`, and assert
+UI behaviour without a real browser: model dropdown, Go flow, Send/multi-turn, Enter key,
+Stop, error surfaces.
+
+These run on every `npm test` and block merges if they fail.
+
+### Tier 2 — Live loop (opt-in)
+
+`e2e/test/live-loop.test.ts` starts a fixture HTTP server and a scripted OpenAI-compat
+server (both on loopback), calls `bootLive` to launch real Chrome, then drives the
+session via `TytoClient`. A **second, independent CDP connection** verifies the browser
+actually navigated — without trusting the code under test.
+
+Requires Chrome on `PATH` and `TYTO_E2E=1 TYTO_LIVE=1`.
+
+### Tier 3 — Extension panel (opt-in, Playwright)
+
+`e2e/test/extension-panel.test.ts` uses `chromium.launchPersistentContext` with
+`--load-extension=extension/` to run the real extension. An in-process host (with fakes
++ scripted model) is started. The host token is seeded into `chrome.storage.session` via
+the service worker. Playwright then drives `sidepanel.html` as a tab.
+
+Playwright's role is strictly the operator's finger on the panel DOM. Page actuation
+stays Tyto's. The test asserts: model dropdown populated, goal send → assistant reply
+visible, token absent from DOM.
+
+Requires `TYTO_E2E=1`.
+
+### Tier 4 — Ollama nightly (non-gating)
+
+`e2e/test/ollama-live.test.ts` hits a local Ollama instance, lists models, then sends a
+single-step session and asserts the response parses as a valid plan. Catches prompt /
+format drift before it affects users. Never blocks a merge.
+
+Requires `TYTO_MODEL_LIVE=1` (plus Ollama running with `TYTO_BASE_URL` + `TYTO_MODEL`).
+
+### CI
+
+`.github/workflows/ci.yml` — airplane-mode check, runs on every push / PR.
+`.github/workflows/e2e.yml` — Tiers 2–3, nightly + `workflow_dispatch`, marked
+`continue-on-error: true`. Not required for merge.

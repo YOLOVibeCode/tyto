@@ -1,0 +1,62 @@
+name: e2e (nightly, non-gating)
+
+# Runs nightly and on manual dispatch.
+# NOT required for merge — a failing nightly only informs; it never blocks.
+on:
+  schedule:
+    - cron: "0 4 * * *"   # 04:00 UTC every day
+  workflow_dispatch:
+    inputs:
+      tiers:
+        description: "Which tiers to run (2, 3, 2+3, all)"
+        required: false
+        default: "2+3"
+
+permissions:
+  contents: read
+
+jobs:
+  live-loop:
+    name: "Tier 2 — live loop (Tyto drives Chrome)"
+    runs-on: ubuntu-latest
+    # Non-required: failures notify but don't block merges
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
+      - name: Run live loop tests (Tier 2)
+        env:
+          TYTO_E2E: "1"
+          TYTO_LIVE: "1"
+          TYTO_HOST_TOKEN: ${{ secrets.TYTO_E2E_TOKEN || 'e2e-ci-token-placeholder-32ch' }}
+        run: npx vitest run --config e2e/vitest.config.ts --reporter=verbose e2e/test/live-loop.test.ts
+
+  extension-panel:
+    name: "Tier 3 — extension panel (Playwright)"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Run extension panel tests (Tier 3)
+        env:
+          TYTO_E2E: "1"
+        run: npx vitest run --config e2e/vitest.config.ts --reporter=verbose e2e/test/extension-panel.test.ts

@@ -48,6 +48,12 @@ export type DispatchPorts = {
   occupancy?: Occupancy;
   operator?: Operator;
   models?: ModelPort;
+  /** Host-configured catalog base URL — used when client omits baseUrl in models.list */
+  modelBaseUrl?: URL;
+  /** Host-configured catalog API key */
+  modelApiKey?: string;
+  /** Factory that creates a ModelPort for a given model id using host credentials */
+  modelResolver?: (id: string) => ModelPort;
   catalog?: ModelCatalog;
   vault?: IdentityVault;
   profiles?: ProfileCatalog;
@@ -122,7 +128,7 @@ export async function dispatch(
     case "models.complete":
       return modelsComplete(params, need(ports.models, "models"), need(ports.redactor, "redactor"));
     case "models.list":
-      return modelsList(params, need(ports.catalog, "catalog"));
+      return modelsList(params, need(ports.catalog, "catalog"), ports);
   }
 }
 
@@ -151,7 +157,7 @@ async function sessionRun(params: unknown, ports: DispatchPorts, signal: AbortSi
   if (!session) throw new RpcException(RPC_ERROR.INVALID_PARAMS, "session not found");
   const perception = need(ports.perception, "perception");
   const actuation = need(ports.actuation, "actuation");
-  const model = need(ports.models, "models");
+  const model = resolveModel(session.model.id, ports);
   const occupancy = need(ports.occupancy, "occupancy");
   const redactor = need(ports.redactor, "redactor");
   const frame = runFrame(params, session);
@@ -163,6 +169,13 @@ async function sessionRun(params: unknown, ports: DispatchPorts, signal: AbortSi
     loop.release();
   }
   return { ok: true };
+}
+
+function resolveModel(sessionModelId: string, ports: DispatchPorts): ModelPort {
+  if (sessionModelId && ports.modelResolver) {
+    return ports.modelResolver(sessionModelId);
+  }
+  return need(ports.models, "models");
 }
 
 function runFrame(params: unknown, session: Session): FrameRef {
@@ -299,17 +312,13 @@ async function modelsComplete(params: unknown, models: ModelPort, redactor: Reda
   return models.complete(redactor.prompt(req));
 }
 
-async function modelsList(params: unknown, catalog: ModelCatalog): Promise<unknown> {
-  const p = record(params);
-  const base = String(p.baseUrl ?? "");
-  if (!base) throw new RpcException(RPC_ERROR.INVALID_PARAMS, "baseUrl required");
-  let url: URL;
-  try {
-    url = new URL(base);
-  } catch {
-    throw new RpcException(RPC_ERROR.INVALID_PARAMS, "baseUrl invalid");
+async function modelsList(params: unknown, catalog: ModelCatalog, ports: DispatchPorts): Promise<unknown> {
+  const hostUrl = ports.modelBaseUrl;
+  if (!hostUrl) {
+    throw new RpcException(RPC_ERROR.INTERNAL, "model catalog not configured");
   }
-  return catalog.list(url, String(p.apiKey ?? ""));
+  const ids = await catalog.list(hostUrl, ports.modelApiKey ?? "");
+  return { ids };
 }
 
 function frameRef(params: unknown): FrameRef {

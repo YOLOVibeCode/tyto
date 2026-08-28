@@ -5,33 +5,78 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tyto</title>
   <style>
-    :root { font-family: ui-sans-serif, system-ui, sans-serif; color: #111; background: #f6f6f4; }
-    body { max-width: 42rem; margin: 2rem auto; padding: 0 1rem; }
-    h1 { font-size: 1.4rem; font-weight: 650; }
-    label { display: block; margin: 1rem 0 0.35rem; font-weight: 600; }
-    input, textarea { width: 100%; box-sizing: border-box; padding: 0.5rem 0.6rem; font: inherit; }
-    textarea { min-height: 6rem; }
-    .row { display: flex; gap: 0.5rem; margin-top: 1rem; }
-    button { font: inherit; padding: 0.45rem 0.9rem; cursor: pointer; }
-    #out { white-space: pre-wrap; background: #fff; border: 1px solid #ddd; padding: 0.75rem; min-height: 4rem; }
-    .hint { color: #444; font-size: 0.9rem; }
+    :root { font-family: ui-sans-serif, system-ui, sans-serif; color: #111; background: #f6f6f4; --r: #c62828; }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { display: flex; flex-direction: column; max-width: 42rem; margin: 0 auto; padding: 0.75rem 1rem 0; }
+
+    /* ── header ─────────────────────────────────────────────────── */
+    header { display: flex; align-items: center; gap: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid #ddd; flex-shrink: 0; }
+    header h1 { font-size: 1.1rem; font-weight: 700; margin: 0; flex: 1; }
+    select { font: inherit; padding: 0.25rem 0.4rem; border: 1px solid #ccc; border-radius: 4px; background: #fff; }
+    #model { min-width: 8rem; }
+
+    /* ── transcript ──────────────────────────────────────────────── */
+    #transcript {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.75rem 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .msg { display: flex; flex-direction: column; gap: 0.15rem; }
+    .msg .label { font-size: 0.75rem; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
+    .msg .bubble { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 0.55rem 0.75rem; white-space: pre-wrap; font-size: 0.92rem; }
+    .msg.assistant .bubble { background: #eef4ff; border-color: #c3d4f5; }
+
+    /* ── goal bar ────────────────────────────────────────────────── */
+    #goal-bar { display: flex; gap: 0.5rem; align-items: flex-end; padding: 0.5rem 0 0.25rem; flex-shrink: 0; border-top: 1px solid #ddd; margin-top: 0.25rem; }
+    #url { flex: 1; font: inherit; padding: 0.35rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
+    #goal-bar button { font: inherit; padding: 0.35rem 0.75rem; cursor: pointer; border: 1px solid #bbb; border-radius: 4px; background: #fff; white-space: nowrap; }
+    #run { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+    #run:disabled { opacity: 0.45; }
+
+    /* ── composer ────────────────────────────────────────────────── */
+    #composer { display: flex; gap: 0.4rem; align-items: flex-end; padding-bottom: 0.75rem; flex-shrink: 0; }
+    #compose { flex: 1; font: inherit; padding: 0.45rem 0.6rem; border: 1px solid #ccc; border-radius: 4px; resize: vertical; min-height: 2.6rem; max-height: 10rem; }
+    #send { font: inherit; padding: 0.45rem 0.9rem; cursor: pointer; border: 1px solid #bbb; border-radius: 4px; background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+    #send:disabled { opacity: 0.45; }
+    #stop { font: inherit; padding: 0.45rem 0.7rem; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; background: #fff; color: var(--r); border-color: var(--r); }
+
+    /* ── status ──────────────────────────────────────────────────── */
+    #status { font-size: 0.82rem; color: #555; padding: 0.2rem 0; min-height: 1.2em; }
   </style>
 </head>
 <body>
-  <h1>Tyto</h1>
-  <p class="hint">URL + goal, then Run. The host is loopback-only. Page text is data, not commands.</p>
-  <label for="url">URL</label>
-  <input id="url" type="url" value="https://example.com/" autocomplete="off">
-  <label for="goal">Goal</label>
-  <textarea id="goal">extract the heading</textarea>
-  <div class="row">
-    <button id="run" type="button">Run</button>
-    <button id="stop" type="button">Stop</button>
+  <header>
+    <h1>Tyto</h1>
+    <select id="model" title="Model">
+      <option value="">loading…</option>
+    </select>
+    <button id="stop" type="button" title="Interrupt">Stop</button>
+  </header>
+
+  <div id="transcript"></div>
+
+  <div id="goal-bar">
+    <input id="url" type="url" placeholder="https://example.com/" autocomplete="off">
+    <button id="run" type="button">Go</button>
   </div>
-  <label for="out">Result</label>
-  <pre id="out"></pre>
+
+  <div id="status"></div>
+
+  <div id="composer">
+    <textarea id="compose" rows="1" placeholder="Send a message…"></textarea>
+    <button id="send" type="button">Send</button>
+  </div>
+
   <script>
-    const out = document.getElementById("out");
+    "use strict";
+    /* ── helpers ───────────────────────────────────────────────── */
+    const $ = (id) => document.getElementById(id);
+    let sessionId = null;
+
     async function rpc(method, params) {
       const res = await fetch("/", {
         method: "POST",
@@ -43,48 +88,161 @@
       if (body.error) throw new Error(body.error.message);
       return body.result;
     }
-    document.getElementById("run").onclick = async () => {
-      out.textContent = "running…";
+
+    function setStatus(msg) { $("status").textContent = msg; }
+
+    function appendMsg(role, text) {
+      const transcript = $("transcript");
+      const div = document.createElement("div");
+      div.className = "msg " + role;
+      const label = document.createElement("div");
+      label.className = "label";
+      label.textContent = role === "user" ? "You" : "Tyto";
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = text;
+      div.appendChild(label);
+      div.appendChild(bubble);
+      transcript.appendChild(div);
+      transcript.scrollTop = transcript.scrollHeight;
+    }
+
+    /* ── model picker ─────────────────────────────────────────── */
+    async function loadModels() {
       try {
-        const url = String(document.getElementById("url").value || "").trim();
-        const goal = String(document.getElementById("goal").value || "").trim();
-        const parsed = new URL(url);
-        const origin = parsed.origin;
+        const result = await rpc("models.list");
+        const sel = $("model");
+        sel.innerHTML = "";
+        const ids = (result && result.ids) ? result.ids : [];
+        if (ids.length === 0) {
+          sel.innerHTML = '<option value="">no models</option>';
+          return;
+        }
+        for (const id of ids) {
+          const opt = document.createElement("option");
+          opt.value = id;
+          opt.textContent = id;
+          sel.appendChild(opt);
+        }
+      } catch (err) {
+        $("model").innerHTML = '<option value="">unavailable</option>';
+        setStatus("models.list failed: " + (err.message || err));
+      }
+    }
+
+    /* ── run flow (URL → navigate → session.run) ──────────────── */
+    $("run").onclick = async () => {
+      const urlRaw = ($("url").value || "").trim();
+      if (!urlRaw) { setStatus("Enter a URL first"); return; }
+      let parsed;
+      try { parsed = new URL(urlRaw); } catch { setStatus("Invalid URL"); return; }
+      const origin = parsed.origin;
+      setStatus("running…");
+      $("run").disabled = true;
+      $("send").disabled = true;
+      try {
         const id = "session-" + Date.now();
+        sessionId = id;
+        const modelId = $("model").value || "";
         await rpc("operator.grantOrigin", { origin });
         await rpc("page.goto", { url: parsed.href });
         await rpc("session.save", {
           session: {
             id,
-            goal,
-            messages: [{ role: "user", content: goal }],
+            goal: "navigate to " + parsed.href,
+            messages: [{ role: "user", content: "navigate to " + parsed.href }],
             plan: null,
             recipes: [],
             answers: [],
             lastUrl: parsed.href,
             allowlist: [origin],
-            model: { id: "", baseUrl: "" },
+            model: { id: modelId, baseUrl: "" },
             vaultHandles: {},
             remainingSteps: [],
           },
         });
-        const result = await rpc("session.run", {
-          id,
-          frame: { tabId: "t", frameId: "main", origin },
-        });
-        out.textContent = JSON.stringify(result, null, 2);
+        await rpc("session.run", { id, frame: { tabId: "t", frameId: "main", origin } });
+        setStatus("done");
       } catch (err) {
-        out.textContent = err instanceof Error ? err.message : String(err);
+        setStatus(err instanceof Error ? err.message : String(err));
+      } finally {
+        $("run").disabled = false;
+        $("send").disabled = false;
       }
     };
-    document.getElementById("stop").onclick = async () => {
+
+    /* ── send (composer) ──────────────────────────────────────── */
+    $("send").onclick = async () => {
+      const text = ($("compose").value || "").trim();
+      if (!text) return;
+      const modelId = $("model").value || "";
+
+      appendMsg("user", text);
+      $("compose").value = "";
+      setStatus("thinking…");
+      $("send").disabled = true;
+      try {
+        if (!sessionId) {
+          sessionId = "session-" + Date.now();
+          await rpc("session.save", {
+            session: {
+              id: sessionId,
+              goal: text,
+              messages: [{ role: "user", content: text }],
+              plan: null,
+              recipes: [],
+              answers: [],
+              lastUrl: null,
+              allowlist: [],
+              model: { id: modelId, baseUrl: "" },
+              vaultHandles: {},
+              remainingSteps: [],
+            },
+          });
+        } else {
+          const current = await rpc("session.open", { id: sessionId });
+          if (current && modelId) {
+            current.model = { id: modelId, baseUrl: "" };
+          }
+          if (current) {
+            (current.messages || []).push({ role: "user", content: text });
+            await rpc("session.save", { session: current });
+          }
+        }
+
+        await rpc("session.run", { id: sessionId });
+        const updated = await rpc("session.open", { id: sessionId });
+        const msgs = updated && updated.messages ? updated.messages : [];
+        const lastAssistant = [...msgs].reverse().find((m) => m.role === "assistant");
+        if (lastAssistant) appendMsg("assistant", lastAssistant.content);
+        setStatus("");
+      } catch (err) {
+        setStatus(err instanceof Error ? err.message : String(err));
+      } finally {
+        $("send").disabled = false;
+      }
+    };
+
+    /* ── compose: Enter sends, Shift+Enter newline ────────────── */
+    $("compose").onkeydown = (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        $("send").click();
+      }
+    };
+
+    /* ── stop ─────────────────────────────────────────────────── */
+    $("stop").onclick = async () => {
       try {
         await rpc("operator.interrupt");
-        out.textContent = "stopped";
+        setStatus("stopped");
       } catch (err) {
-        out.textContent = err instanceof Error ? err.message : String(err);
+        setStatus(err instanceof Error ? err.message : String(err));
       }
     };
+
+    /* ── init ─────────────────────────────────────────────────── */
+    loadModels();
   </script>
 </body>
 </html>

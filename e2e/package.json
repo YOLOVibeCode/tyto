@@ -1,0 +1,17 @@
+{
+  "name": "@tyto/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end tests for Tyto (opt-in, not gating npm test).",
+  "dependencies": {
+    "@tyto/cdp": "*",
+    "@tyto/core": "*",
+    "@tyto/host": "*",
+    "@tyto/llm": "*",
+    "@tyto/sdk": "*"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}
