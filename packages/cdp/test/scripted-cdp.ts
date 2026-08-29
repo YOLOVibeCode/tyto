@@ -25,6 +25,10 @@ export class ScriptedCdp {
       method === "Target.setAutoAttach" ||
       method === "Page.enable" ||
       method === "Page.navigate" ||
+      method === "Page.addScriptToEvaluateOnNewDocument" ||
+      method === "Runtime.addBinding" ||
+      method === "Runtime.enable" ||
+      method === "Input.insertText" ||
       method === "Accessibility.enable"
     ) {
       return {};

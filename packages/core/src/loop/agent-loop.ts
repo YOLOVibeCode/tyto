@@ -29,6 +29,7 @@ export class AgentLoop {
     this.unsub = deps.occupancy.onOperatorInput(() => {
       this.phase = "idle";
       this.ephemeralRefs = null;
+      if (!this.deps.occupancy.operatorActive()) this.halted = true;
     });
   }
 

@@ -3,15 +3,27 @@ import type { Unsubscribe } from "../types.ts";
 
 /** Production occupancy when no CDP input stream is attached. The seat stays idle. */
 export class IdleOccupancy implements Occupancy {
+  private active = false;
+  private readonly listeners = new Set<() => void>();
+
   operatorActive(): boolean {
-    return false;
+    return this.active;
   }
 
-  interrupt(): void {}
+  interrupt(): void {
+    this.active = false;
+    for (const fn of this.listeners) fn();
+  }
 
-  yieldToOperator(): void {}
+  yieldToOperator(): void {
+    this.active = true;
+    for (const fn of this.listeners) fn();
+  }
 
-  onOperatorInput(_fn: () => void): Unsubscribe {
-    return () => undefined;
+  onOperatorInput(fn: () => void): Unsubscribe {
+    this.listeners.add(fn);
+    return () => {
+      this.listeners.delete(fn);
+    };
   }
 }

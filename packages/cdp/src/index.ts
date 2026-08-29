@@ -1,4 +1,5 @@
 export type { CdpWire } from "./wire.ts";
+export { CdpOccupancy, WEAVE_BINDING, type AgentInputGate } from "./occupancy.ts";
 export { CdpActuation } from "./actuation.ts";
 export { CdpPerception } from "./perception.ts";
 export { CdpFrameGraph } from "./frames.ts";

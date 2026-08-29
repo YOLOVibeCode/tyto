@@ -165,6 +165,8 @@ describe("host browser.launch attaches CDP adapters", () => {
     await client.call("operator.grantOrigin", { origin: "https://example.com" });
     await client.call("page.goto", { url: "https://example.com/" });
     expect(methods).toContain("Page.navigate");
+    expect(methods).toContain("Runtime.addBinding");
+    expect(methods).toContain("Page.addScriptToEvaluateOnNewDocument");
     expect(methods.join(" ")).not.toMatch(/Runtime\.evaluate/);
   });
 });

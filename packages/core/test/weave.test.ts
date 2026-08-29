@@ -42,6 +42,17 @@ describe("weave occupancy", () => {
     expect(loop.phase).toBe("idle");
   });
 
+  it("occupancy.interrupt (Esc / Stop) halts the loop so later ticks still do not perform", async () => {
+    const { loop, session, occupancy, actuation, snap } = harness();
+    occupancy.interrupt();
+    await loop.act(session, snap, FRAME);
+    expect(actuation.performed).toHaveLength(0);
+    occupancy.active = false;
+    await loop.act(session, snap, FRAME);
+    expect(actuation.performed).toHaveLength(0);
+    expect(loop.phase).toBe("idle");
+  });
+
   it("Esc → Idle", async () => {
     const { loop, occupancy, actuation, session, snap } = harness();
     occupancy.noteInput();

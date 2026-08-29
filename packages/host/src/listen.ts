@@ -32,7 +32,7 @@ export async function listen(config: ListenConfig): Promise<HostServer> {
     ...config,
     redactor: config.redactor ?? new SecretRedactor(),
   };
-  const runtime: Runtime = { browser: undefined };
+  const runtime: Runtime = { browser: undefined, loop: undefined };
 
   const server = createServer((req, res) => {
     void handleRequest(req, res, config.token, ports, runtime);

@@ -32,6 +32,7 @@ import { record, RpcException } from "./rpc.ts";
 
 export type Runtime = {
   browser: BrowserHandle | undefined;
+  loop: AgentLoop | undefined;
 };
 
 export type DispatchPorts = {
@@ -83,7 +84,7 @@ export async function dispatch(
     case "session.list":
       return ports.sessions.list();
     case "session.run":
-      return sessionRun(params, ports, signal);
+      return sessionRun(params, ports, runtime, signal);
     case "profiles.list":
       return profilesList(params, ports.profiles);
     case "browser.launch":
@@ -113,6 +114,7 @@ export async function dispatch(
     case "tape.wait":
       return tapeWait(params, need(ports.observation, "observation"), need(ports.redactor, "redactor"), signal);
     case "operator.interrupt":
+      runtime.loop?.stop();
       ports.occupancy?.interrupt();
       return { ok: true };
     case "operator.confirm":
@@ -149,7 +151,12 @@ async function sessionSave(params: unknown, sessions: SessionStore): Promise<unk
   return { ok: true };
 }
 
-async function sessionRun(params: unknown, ports: DispatchPorts, signal: AbortSignal): Promise<unknown> {
+async function sessionRun(
+  params: unknown,
+  ports: DispatchPorts,
+  runtime: Runtime,
+  signal: AbortSignal,
+): Promise<unknown> {
   if (signal.aborted) throw abortError(signal);
   const id = String(record(params).id ?? "");
   if (!id) throw new RpcException(RPC_ERROR.INVALID_PARAMS, "session.id required");
@@ -163,10 +170,12 @@ async function sessionRun(params: unknown, ports: DispatchPorts, signal: AbortSi
   const frame = runFrame(params, session);
   const snap = await perception.snapshot(frame);
   const loop = new AgentLoop({ store: ports.sessions, occupancy, actuation, model, redactor });
+  runtime.loop = loop;
   try {
     await loop.play(session, snap, frame);
   } finally {
     loop.release();
+    if (runtime.loop === loop) runtime.loop = undefined;
   }
   return { ok: true };
 }
@@ -210,7 +219,7 @@ async function browserLaunch(
     port: Number(p.port ?? 0),
     bindHost: "127.0.0.1",
   });
-  attachCdpAdapters(runtime.browser, ports);
+  await attachCdpAdapters(runtime.browser, ports, runtime);
   return { ok: true };
 }
 

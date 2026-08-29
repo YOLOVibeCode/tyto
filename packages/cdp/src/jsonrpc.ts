@@ -14,9 +14,17 @@ export class JsonRpcCdp {
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
   private readonly unsub: () => void;
+  private readonly eventListeners = new Set<(method: string, params: unknown, sessionId?: string) => void>();
 
   constructor(private readonly transport: CdpTransport) {
     this.unsub = transport.subscribe((text) => this.onMessage(text));
+  }
+
+  onEvent(fn: (method: string, params: unknown, sessionId?: string) => void): () => void {
+    this.eventListeners.add(fn);
+    return () => {
+      this.eventListeners.delete(fn);
+    };
   }
 
   async send(method: string, params?: Record<string, unknown>, sessionId?: string): Promise<unknown> {
@@ -46,6 +54,14 @@ export class JsonRpcCdp {
     }
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return;
     const msg = parsed as Record<string, unknown>;
+    if (typeof msg.method === "string" && typeof msg.id !== "number") {
+      const sid = typeof msg.sessionId === "string" ? msg.sessionId : undefined;
+      for (const fn of this.eventListeners) {
+        if (sid !== undefined) fn(msg.method, msg.params, sid);
+        else fn(msg.method, msg.params);
+      }
+      return;
+    }
     if (typeof msg.id !== "number") return;
     const pending = this.pending.get(msg.id);
     if (!pending) return;

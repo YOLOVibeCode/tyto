@@ -60,6 +60,19 @@ describe("owned CDP JSON-RPC wire", () => {
     await expect(pending).rejects.toMatchObject({ message: "session closed" });
   });
 
+  it("event without id is delivered to onEvent subscribers", async () => {
+    const t = new QueueTransport();
+    const cdp = new JsonRpcCdp(t);
+    const seen: Array<{ method: string; params: unknown }> = [];
+    cdp.onEvent((method, params) => {
+      seen.push({ method, params });
+    });
+    t.reply(JSON.stringify({ method: "Runtime.bindingCalled", params: { name: "tytoWeave", payload: "{\"kind\":\"key\"}" } }));
+    expect(seen).toEqual([
+      { method: "Runtime.bindingCalled", params: { name: "tytoWeave", payload: '{"kind":"key"}' } },
+    ]);
+  });
+
   it("event without id does not settle a pending call", async () => {
     const t = new QueueTransport();
     const cdp = new JsonRpcCdp(t);

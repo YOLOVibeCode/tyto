@@ -173,6 +173,57 @@ describe("host kernel", () => {
     expect(opened.plan?.steps[0]?.op).toBe("click");
   });
 
+  it("operator.interrupt stops a running session.run before further acts", async () => {
+    const perception = new FakePerception();
+    let release: (() => void) | undefined;
+    const hold = new Promise<void>((r) => {
+      release = r;
+    });
+    let inPerform: (() => void) | undefined;
+    const started = new Promise<void>((r) => {
+      inPerform = r;
+    });
+    const actuation = new FakeActuation();
+    actuation.perform = async (intent) => {
+      actuation.performed.push(intent);
+      inPerform?.();
+      await hold;
+    };
+    const occupancy = new FakeOccupancy();
+    perception.currentUrl = "https://en.wikipedia.org/wiki/Main_Page";
+    perception.seedUrl(
+      "https://en.wikipedia.org/wiki/Main_Page",
+      [
+        { nodeId: "1", childIds: ["2"], role: { value: "WebArea" }, name: { value: "Wikipedia" } },
+        {
+          nodeId: "2",
+          parentId: "1",
+          role: { value: "button" },
+          name: { value: "Search" },
+          backendDOMNodeId: 43,
+        },
+      ],
+      "Wikipedia",
+    );
+    const session = emptySession("halt-1", "search");
+    session.remainingSteps = [
+      { op: "click", role: "button", name: "Search" },
+      { op: "click", role: "button", name: "Search" },
+    ];
+    const server = await boot({ perception, actuation, occupancy, models: new FakeModel() });
+    const client = new TytoClient({ url: server.url, token: TOKEN });
+    await client.call("session.save", { session });
+    const running = client.call("session.run", {
+      id: "halt-1",
+      frame: { tabId: "t", frameId: "main", origin: "https://en.wikipedia.org" },
+    });
+    await started;
+    await client.call("operator.interrupt");
+    release?.();
+    await running;
+    expect(actuation.performed).toHaveLength(1);
+  });
+
   it("models.complete: Redactor.prompt strips Cookie value before ModelPort.complete", async () => {
     const models = new FakeModel();
     const server = await boot({ models });

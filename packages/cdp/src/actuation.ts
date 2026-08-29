@@ -1,27 +1,34 @@
 import type { Actuation, FrameRef, TrustedIntent } from "@tyto/core";
 import { asRecord, cdpCall, type CdpWire } from "./wire.ts";
+import type { AgentInputGate } from "./occupancy.ts";
 
 export class CdpActuation implements Actuation {
   constructor(
     private readonly wire: CdpWire,
     private readonly sessionFor: (frame: FrameRef) => string | undefined = () => undefined,
+    private readonly gate: AgentInputGate | undefined = undefined,
   ) {}
 
   async perform(intent: TrustedIntent): Promise<void> {
-    const sid = this.sessionFor(intent.frame);
-    if (intent.op === "press") {
-      const key = intent.key ?? "";
-      await cdpCall(this.wire, "Input.dispatchKeyEvent", { type: "keyDown", key }, sid);
-      await cdpCall(this.wire, "Input.dispatchKeyEvent", { type: "keyUp", key }, sid);
-      return;
-    }
-    if (intent.op === "scroll" && intent.node !== undefined) {
-      await cdpCall(this.wire, "DOM.scrollIntoViewIfNeeded", { backendNodeId: intent.node }, sid);
-      return;
-    }
-    await this.click(intent, sid);
-    if ((intent.op === "fill" || intent.op === "insertText") && intent.text) {
-      await cdpCall(this.wire, "Input.insertText", { text: intent.text }, sid);
+    this.gate?.enter();
+    try {
+      const sid = this.sessionFor(intent.frame);
+      if (intent.op === "press") {
+        const key = intent.key ?? "";
+        await cdpCall(this.wire, "Input.dispatchKeyEvent", { type: "keyDown", key }, sid);
+        await cdpCall(this.wire, "Input.dispatchKeyEvent", { type: "keyUp", key }, sid);
+        return;
+      }
+      if (intent.op === "scroll" && intent.node !== undefined) {
+        await cdpCall(this.wire, "DOM.scrollIntoViewIfNeeded", { backendNodeId: intent.node }, sid);
+        return;
+      }
+      await this.click(intent, sid);
+      if ((intent.op === "fill" || intent.op === "insertText") && intent.text) {
+        await cdpCall(this.wire, "Input.insertText", { text: intent.text }, sid);
+      }
+    } finally {
+      this.gate?.exit();
     }
   }
 

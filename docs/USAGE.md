@@ -203,7 +203,9 @@ The last scope choice is persisted in `chrome.storage.local`.
 
 ### Stop
 
-**Stop** sends `operator.interrupt` to the running session.
+**Stop** sends `operator.interrupt` to the running session. Typing or clicking
+in the launched Chrome window yields occupancy (the agent re-snapshots and does
+not overwrite mid-keystroke). Esc and Stop halt the loop so it stays Idle.
 
 ---
 
@@ -265,6 +267,22 @@ Requires Chrome on `PATH` and `TYTO_E2E=1 TYTO_LIVE=1`.
 captures via `CdpCredentialStore` + the identity vault, quits Chrome, relaunches an
 empty profile, restores, and checks the account page is still authenticated. It then
 greps the session file, tape, model prompt, and vault ciphertext for the cookie value.
+
+`e2e/test/weave-live.test.ts` types into the search fixture as the operator, then
+asks the agent to fill the same box. The agent must yield; the operator's text stays.
+
+Unattended exit codes (Slice 14) are `runUnattended` in `@tyto/core`. Preflight:
+
+```bash
+npm run run:unattended -- --session <id> [--allow-confirm-fail]
+```
+
+| Code | Meaning |
+|---|---|
+| 0 | done |
+| 2 | document still a shell (`ShellNotReady`) |
+| 3 | allowlist deny |
+| 4 | confirm required (`--no-confirm`, the default) |
 
 ### Tier 3 — Extension panel (opt-in, Playwright)
 

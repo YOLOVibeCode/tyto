@@ -24,6 +24,7 @@
     "lint:imports": "node scripts/check-core-imports.mjs",
     "check": "npm run lint:imports && npm run secrets:scan && npm test && npm run typecheck",
     "start": "tsx packages/host/src/cli.ts",
+    "run:unattended": "tsx packages/host/src/run.ts",
     "test:e2e": "TYTO_E2E=1 TYTO_LIVE=1 vitest run --config e2e/vitest.config.ts",
     "poc": "npx tsx poc/run.ts"
   },
