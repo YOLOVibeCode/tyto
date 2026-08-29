@@ -19,6 +19,7 @@ export { applyPageMessage } from "./policy/page-command.ts";
 export { AgentLoop, type LoopPhase } from "./loop/agent-loop.ts";
 export { waitForTape, type TapeWaitResult } from "./loop/wait.ts";
 export { IdleOccupancy } from "./occupancy/idle.ts";
+export { SystemClock } from "./clock/system.ts";
 export { MemoryTape } from "./tape/memory.ts";
 export { RUNNER_EXIT, unattendedExit } from "./runner/exit.ts";
 export { runUnattended, parseRunnerArgs, intentFromStep, type UnattendedDeps } from "./runner/run.ts";

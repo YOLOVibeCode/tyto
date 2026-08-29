@@ -3,18 +3,36 @@ import { compactAx } from "../src/ax/compact.ts";
 import { AgentLoop } from "../src/loop/agent-loop.ts";
 import { SecretRedactor } from "../src/identity/redact.ts";
 import { emptySession } from "../src/session/schema.ts";
-import { FakeActuation, FakeModel, FakeOccupancy, MemorySessionStore } from "../src/testing/fakes.ts";
+import {
+  FakeActuation,
+  FakeClock,
+  FakeModel,
+  FakeOccupancy,
+  FakePerception,
+  MemorySessionStore,
+} from "../src/testing/fakes.ts";
+
+function loopOf(over: {
+  model?: FakeModel;
+  occupancy?: FakeOccupancy;
+  actuation?: FakeActuation;
+  store?: MemorySessionStore;
+} = {}): AgentLoop {
+  return new AgentLoop({
+    store: over.store ?? new MemorySessionStore(),
+    occupancy: over.occupancy ?? new FakeOccupancy(),
+    actuation: over.actuation ?? new FakeActuation(),
+    model: over.model ?? new FakeModel(),
+    redactor: new SecretRedactor(),
+    perception: new FakePerception(),
+    clock: new FakeClock(),
+  });
+}
 
 describe("AgentLoop", () => {
   it("limit: AgentLoop calls ModelPort at most twice per page generation", async () => {
     const model = new FakeModel();
-    const loop = new AgentLoop({
-      store: new MemorySessionStore(),
-      occupancy: new FakeOccupancy(),
-      actuation: new FakeActuation(),
-      model,
-      redactor: new SecretRedactor(),
-    });
+    const loop = loopOf({ model });
     const session = emptySession("s1", "find owl");
     const snap = compactAx(
       [{ nodeId: "1", role: { value: "WebArea" }, name: { value: "Home" } }],
@@ -30,14 +48,7 @@ describe("AgentLoop", () => {
     const occupancy = new FakeOccupancy();
     occupancy.active = true;
     const actuation = new FakeActuation();
-    const store = new MemorySessionStore();
-    const loop = new AgentLoop({
-      store,
-      occupancy,
-      actuation,
-      model: new FakeModel(),
-      redactor: new SecretRedactor(),
-    });
+    const loop = loopOf({ occupancy, actuation, store: new MemorySessionStore() });
     const session = emptySession("s1", "x");
     session.remainingSteps = [{ op: "click", role: "button", name: "Go" }];
     const snap = compactAx(
@@ -54,13 +65,7 @@ describe("AgentLoop", () => {
   it("KILL client: SessionStore still has plan after loop.stop()", async () => {
     const store = new MemorySessionStore();
     const occupancy = new FakeOccupancy();
-    const loop = new AgentLoop({
-      store,
-      occupancy,
-      actuation: new FakeActuation(),
-      model: new FakeModel(),
-      redactor: new SecretRedactor(),
-    });
+    const loop = loopOf({ store, occupancy });
     const session = emptySession("s1", "goal");
     session.plan = { rationale: "x", anchors: [], steps: [{ op: "done", reason: "ok" }] };
     await store.save(session);
@@ -71,13 +76,7 @@ describe("AgentLoop", () => {
 
   it("AgentLoop: Redactor.prompt called before every ModelPort.complete", async () => {
     const model = new FakeModel();
-    const loop = new AgentLoop({
-      store: new MemorySessionStore(),
-      occupancy: new FakeOccupancy(),
-      actuation: new FakeActuation(),
-      model,
-      redactor: new SecretRedactor(),
-    });
+    const loop = loopOf({ model });
     const session = emptySession("s1", "Cookie: sessionid=shouldneverreachmodel");
     const snap = compactAx(
       [{ nodeId: "1", role: { value: "WebArea" }, name: { value: "Home" } }],
@@ -89,13 +88,7 @@ describe("AgentLoop", () => {
 
   it("trusted click records frameRef of the focused frame", async () => {
     const actuation = new FakeActuation();
-    const loop = new AgentLoop({
-      store: new MemorySessionStore(),
-      occupancy: new FakeOccupancy(),
-      actuation,
-      model: new FakeModel(),
-      redactor: new SecretRedactor(),
-    });
+    const loop = loopOf({ actuation });
     const session = emptySession("s1", "x");
     session.remainingSteps = [{ op: "click", role: "button", name: "Go" }];
     const snap = compactAx(

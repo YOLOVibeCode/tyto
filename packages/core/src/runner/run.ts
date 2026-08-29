@@ -1,8 +1,10 @@
 import { AgentLoop } from "../loop/agent-loop.ts";
 import { extractOrThrow } from "../ax/extract.ts";
 import { classifyStats } from "../ready/classify.ts";
+import { SystemClock } from "../clock/system.ts";
 import type { Allowlist } from "../ports/allowlist.ts";
 import type { Actuation } from "../ports/actuation.ts";
+import type { Clock } from "../ports/clock.ts";
 import type { ConfirmGate } from "../ports/confirm-gate.ts";
 import type { ModelPort } from "../ports/model.ts";
 import type { Navigation } from "../ports/navigation.ts";
@@ -24,6 +26,7 @@ export type UnattendedDeps = {
   navigation: Navigation;
   perception: Perception;
   confirm: ConfirmGate;
+  clock?: Clock;
 };
 
 export function parseRunnerArgs(argv: string[]): { sessionId: string; allowConfirmFail: boolean } {
@@ -106,6 +109,8 @@ export async function runUnattended(
     actuation: deps.actuation,
     model: deps.model,
     redactor: deps.redactor,
+    perception: deps.perception,
+    clock: deps.clock ?? new SystemClock(),
   });
   try {
     await loop.play(session, snap, frame);

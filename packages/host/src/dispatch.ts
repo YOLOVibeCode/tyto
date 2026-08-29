@@ -8,6 +8,7 @@ import type {
   Extractor,
   FrameGraph,
   FrameRef,
+  Clock,
   IdentityVault,
   Intent,
   Launcher,
@@ -25,7 +26,7 @@ import type {
   SessionStore,
   TrustedIntent,
 } from "@tyto/core";
-import { AgentLoop, parseSession } from "@tyto/core";
+import { AgentLoop, parseSession, SystemClock } from "@tyto/core";
 import { isPerchSafeMethod, RPC_ERROR } from "@tyto/protocol";
 import { attachCdpAdapters } from "./attach-cdp.ts";
 import { record, RpcException } from "./rpc.ts";
@@ -47,6 +48,7 @@ export type DispatchPorts = {
   extractor?: Extractor;
   frames?: FrameGraph;
   occupancy?: Occupancy;
+  clock?: Clock;
   operator?: Operator;
   models?: ModelPort;
   /** Host-configured catalog base URL — used when client omits baseUrl in models.list */
@@ -169,7 +171,15 @@ async function sessionRun(
   const redactor = need(ports.redactor, "redactor");
   const frame = runFrame(params, session);
   const snap = await perception.snapshot(frame);
-  const loop = new AgentLoop({ store: ports.sessions, occupancy, actuation, model, redactor });
+  const loop = new AgentLoop({
+    store: ports.sessions,
+    occupancy,
+    actuation,
+    model,
+    redactor,
+    perception,
+    clock: ports.clock ?? new SystemClock(),
+  });
   runtime.loop = loop;
   try {
     await loop.play(session, snap, frame);

@@ -82,7 +82,7 @@ Do not commit `.env`. Do not paste the token into chat or tickets.
    - **Composer** — type a follow-up goal or message and press **Send** (or
      Enter). Shift+Enter inserts a newline.
 4. Watch the Tyto Chrome window. You can type or click there at any time; Tyto
-   yields to operator input.
+   yields, then resumes from a fresh snapshot when you pause.
 5. **Stop** asks the host to interrupt the running session.
 6. In the terminal: Ctrl+C stops the host.
 
@@ -204,8 +204,9 @@ The last scope choice is persisted in `chrome.storage.local`.
 ### Stop
 
 **Stop** sends `operator.interrupt` to the running session. Typing or clicking
-in the launched Chrome window yields occupancy (the agent re-snapshots and does
-not overwrite mid-keystroke). Esc and Stop halt the loop so it stays Idle.
+in the launched Chrome window yields occupancy (the agent does not overwrite
+mid-keystroke). After you pause, Tyto resumes from a fresh accessibility
+snapshot. Esc and Stop halt the loop so it stays Idle.
 
 ---
 
@@ -269,7 +270,8 @@ empty profile, restores, and checks the account page is still authenticated. It 
 greps the session file, tape, model prompt, and vault ciphertext for the cookie value.
 
 `e2e/test/weave-live.test.ts` types into the search fixture as the operator, then
-asks the agent to fill the same box. The agent must yield; the operator's text stays.
+asks the agent to fill the same box. Mid-keystroke the operator's text stays.
+After the operator pauses, the loop resumes from a fresh snapshot.
 
 Unattended exit codes (Slice 14) are `runUnattended` in `@tyto/core`. Preflight:
 

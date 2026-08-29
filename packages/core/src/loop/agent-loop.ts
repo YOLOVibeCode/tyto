@@ -1,6 +1,8 @@
 import type { Actuation } from "../ports/actuation.ts";
+import type { Clock } from "../ports/clock.ts";
 import type { ModelPort } from "../ports/model.ts";
 import type { Occupancy } from "../ports/occupancy.ts";
+import type { Perception } from "../ports/perception.ts";
 import type { Redactor } from "../ports/redactor.ts";
 import type { SessionStore } from "../ports/session-store.ts";
 import { coercePlan } from "../plan/coerce.ts";
@@ -15,7 +17,11 @@ export type LoopDeps = {
   actuation: Actuation;
   model: ModelPort;
   redactor: Redactor;
+  perception: Perception;
+  clock: Clock;
 };
+
+const OCCUPANCY_POLL_MS = 25;
 
 export class AgentLoop {
   thinkCount = 0;
@@ -34,12 +40,23 @@ export class AgentLoop {
   }
 
   async play(session: Session, snap: AxSnapshot, frame: FrameRef): Promise<void> {
-    if (!this.canReplay(session, snap)) {
-      await this.think(session, snap);
+    let current = snap;
+    if (!this.canReplay(session, current)) {
+      await this.think(session, current);
     }
     while (isActable(session.remainingSteps[0])) {
+      if (this.halted) break;
+      if (this.deps.occupancy.operatorActive()) {
+        await this.waitWhileOccupied();
+        if (this.halted) break;
+        current = await this.deps.perception.snapshot(frame);
+        if (!this.canReplay(session, current)) {
+          await this.think(session, current);
+        }
+        continue;
+      }
       const n = session.remainingSteps.length;
-      await this.act(session, snap, frame);
+      await this.act(session, current, frame);
       if (session.remainingSteps.length === n) break;
     }
   }
@@ -139,6 +156,12 @@ export class AgentLoop {
 
   private shouldYield(): boolean {
     return this.halted || this.deps.occupancy.operatorActive();
+  }
+
+  private async waitWhileOccupied(): Promise<void> {
+    while (!this.halted && this.deps.occupancy.operatorActive()) {
+      await this.deps.clock.sleep(OCCUPANCY_POLL_MS);
+    }
   }
 
   private canReplay(session: Session, snap: AxSnapshot): boolean {

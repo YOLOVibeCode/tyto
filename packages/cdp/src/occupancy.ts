@@ -1,7 +1,10 @@
-import type { Occupancy, Unsubscribe } from "@tyto/core";
+import type { Occupancy, Unsubscribe, Clock } from "@tyto/core";
+import { SystemClock } from "@tyto/core";
 import { cdpCall, type CdpWire } from "./wire.ts";
 
 export const WEAVE_BINDING = "tytoWeave";
+/** Quiet period after trusted input before the seat is idle again. */
+export const WEAVE_IDLE_MS = 800;
 
 export type AgentInputGate = {
   enter(): void;
@@ -39,6 +42,7 @@ export class CdpOccupancy implements Occupancy, AgentInputGate {
   private active = false;
   private suppress = 0;
   private interrupting = false;
+  private idleUntil = 0;
   private readonly listeners = new Set<() => void>();
   onHalt: (() => void) | undefined;
 
@@ -46,6 +50,8 @@ export class CdpOccupancy implements Occupancy, AgentInputGate {
     private readonly wire: CdpWire,
     events: OccupancyEvents,
     private readonly sessionId: () => string | undefined,
+    private readonly clock: Clock = new SystemClock(),
+    private readonly idleMs: number = WEAVE_IDLE_MS,
   ) {
     events.onEvent((method, params) => this.onCdpEvent(method, params));
   }
@@ -66,12 +72,16 @@ export class CdpOccupancy implements Occupancy, AgentInputGate {
   }
 
   operatorActive(): boolean {
+    if (this.active && this.clock.now() >= this.idleUntil) {
+      this.active = false;
+    }
     return this.active;
   }
 
   interrupt(): void {
     if (this.interrupting) return;
     this.interrupting = true;
+    this.idleUntil = 0;
     this.active = false;
     for (const fn of this.listeners) fn();
     try {
@@ -83,6 +93,7 @@ export class CdpOccupancy implements Occupancy, AgentInputGate {
 
   yieldToOperator(): void {
     this.active = true;
+    this.idleUntil = this.clock.now() + this.idleMs;
     for (const fn of this.listeners) fn();
   }
 

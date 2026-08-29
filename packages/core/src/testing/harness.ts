@@ -59,6 +59,8 @@ export function makeLoopHarness(): LoopHarness {
     actuation,
     model,
     redactor: new SecretRedactor(),
+    perception,
+    clock,
   });
   return {
     store,
