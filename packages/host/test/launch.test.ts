@@ -169,4 +169,77 @@ describe("host browser.launch attaches CDP adapters", () => {
     expect(methods).toContain("Page.addScriptToEvaluateOnNewDocument");
     expect(methods.join(" ")).not.toMatch(/Runtime\.evaluate/);
   });
+
+  it("browser.openSteer opens Perch as a new tab; Go still navigates the work tab", async () => {
+    const http = await serveVersion();
+    const calls: Array<{ method: string; params?: Record<string, unknown>; sessionId?: string }> = [];
+    let deliver: ((text: string) => void) | undefined;
+    const launcher = new CdpLauncher({
+      resolveBinary: async () => "/bin/chrome-fake",
+      spawn: async () => ({ kill: () => undefined }),
+      open: async () => ({
+        send(text) {
+          const req = JSON.parse(text) as {
+            id: number;
+            method: string;
+            params?: Record<string, unknown>;
+            sessionId?: string;
+          };
+          const rec: { method: string; params?: Record<string, unknown>; sessionId?: string } = {
+            method: req.method,
+          };
+          if (req.params !== undefined) rec.params = req.params;
+          if (req.sessionId !== undefined) rec.sessionId = req.sessionId;
+          calls.push(rec);
+          const result =
+            req.method === "Target.getTargets"
+              ? { targetInfos: [{ targetId: "page-1", type: "page", url: "about:blank" }] }
+              : req.method === "Target.attachToTarget"
+                ? { sessionId: "sid-page" }
+                : req.method === "Target.createTarget"
+                  ? { targetId: "steer-tab" }
+                  : {};
+          queueMicrotask(() => deliver?.(JSON.stringify({ id: req.id, result })));
+        },
+        subscribe(fn) {
+          deliver = fn;
+          return () => {
+            deliver = undefined;
+          };
+        },
+      }),
+    });
+    const allowlist = new OriginAllowlist();
+    const server = await listen({
+      bind: "127.0.0.1",
+      port: 0,
+      token: TOKEN,
+      sessions: new MemorySessionStore(),
+      allowlist,
+      navigation: new SpyNavigation(),
+      observation: new FakeObservation(),
+      launcher,
+    });
+    servers.push(server);
+    const client = new TytoClient({ url: server.url, token: TOKEN });
+    await client.call("browser.launch", {
+      browser: "chrome",
+      userDataDir: "/tmp/tyto-profile",
+      port: Number(http.port),
+    });
+    const afterLaunch = calls.length;
+    const result = (await client.call("browser.openSteer", {})) as { ok: boolean; targetId: string };
+    expect(result).toMatchObject({ ok: true, targetId: "steer-tab" });
+    const added = calls.slice(afterLaunch);
+    expect(added.map((c) => c.method)).toEqual(["Target.createTarget"]);
+    expect(added[0]?.params).toMatchObject({ url: server.url });
+    expect(added[0]?.sessionId).toBeUndefined();
+    expect(JSON.stringify(added)).not.toMatch(/Runtime\.evaluate/);
+
+    await client.call("operator.grantOrigin", { origin: "https://example.com" });
+    await client.call("page.goto", { url: "https://example.com/" });
+    const nav = calls.find((c) => c.method === "Page.navigate");
+    expect(nav?.sessionId).toBe("sid-page");
+    expect(nav?.params).toMatchObject({ url: "https://example.com/" });
+  });
 });

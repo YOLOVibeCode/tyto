@@ -27,7 +27,7 @@ npm test
 
 Node 22+. Tests must pass **offline** (`npm test` never launches Chrome).
 To drive a real browser from this clone, follow [docs/USAGE.md](./docs/USAGE.md)
-(`npm start`). There is no packaged app yet.
+(`npm start`). There is no native installer yet; `npm start` is one Chrome window.
 
 ## Laws
 

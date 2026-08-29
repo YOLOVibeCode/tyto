@@ -7,6 +7,7 @@ describe("protocol", () => {
     expect(PERCH_SAFE_METHODS.join(" ")).not.toMatch(/cdp\.send|credential/i);
     expect(PERCH_SAFE_METHODS).toContain("identity.status");
     expect(PERCH_SAFE_METHODS).toContain("session.run");
+    expect(PERCH_SAFE_METHODS).toContain("browser.openSteer");
     expect(PERCH_SAFE_METHODS).not.toContain("identity.capture");
     expect(isPerchSafeMethod("session.open")).toBe(true);
     expect(isPerchSafeMethod("debug.cdp")).toBe(false);

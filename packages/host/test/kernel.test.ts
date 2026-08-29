@@ -224,6 +224,12 @@ describe("host kernel", () => {
     expect(actuation.performed).toHaveLength(1);
   });
 
+  it("browser.openSteer before launch fails closed", async () => {
+    const server = await boot();
+    const client = new TytoClient({ url: server.url, token: TOKEN });
+    await expect(client.call("browser.openSteer", {})).rejects.toThrow(/browser not launched/i);
+  });
+
   it("models.complete: Redactor.prompt strips Cookie value before ModelPort.complete", async () => {
     const models = new FakeModel();
     const server = await boot({ models });

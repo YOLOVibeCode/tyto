@@ -32,7 +32,7 @@ export async function listen(config: ListenConfig): Promise<HostServer> {
     ...config,
     redactor: config.redactor ?? new SecretRedactor(),
   };
-  const runtime: Runtime = { browser: undefined, loop: undefined };
+  const runtime: Runtime = { browser: undefined, loop: undefined, steerUrl: "" };
 
   const server = createServer((req, res) => {
     void handleRequest(req, res, config.token, ports, runtime);
@@ -55,11 +55,13 @@ export async function listen(config: ListenConfig): Promise<HostServer> {
 
   const bind = addr.address === "::ffff:127.0.0.1" ? "127.0.0.1" : addr.address;
   let closed = false;
+  const url = `http://127.0.0.1:${addr.port}/`;
+  runtime.steerUrl = url;
 
   return {
     bind,
     port: addr.port,
-    url: `http://127.0.0.1:${addr.port}/`,
+    url,
     async close() {
       if (closed) return;
       closed = true;

@@ -6,6 +6,7 @@ export { CdpFrameGraph } from "./frames.ts";
 export { CdpReadiness } from "./readiness.ts";
 export { CdpNavigation } from "./navigation.ts";
 export { attachPageSession } from "./page-session.ts";
+export { openSteerTab } from "./steer-tab.ts";
 export { chromeLaunchArgs } from "./launch-args.ts";
 export { LocalStateProfileCatalog } from "./profiles.ts";
 export { JsonRpcCdp, type CdpTransport } from "./jsonrpc.ts";

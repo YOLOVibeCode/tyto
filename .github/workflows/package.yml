@@ -1,0 +1,29 @@
+name: package
+
+# Unpacked MV3 zip for chrome://extensions → Load unpacked.
+# Not a Store listing and not ATTACH-to-daily-Chrome.
+on:
+  push:
+    branches: [ci-deploy, main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run package:extension
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tyto-extension
+          path: dist/tyto-extension/
+          if-no-files-found: error

@@ -162,7 +162,7 @@ it is not the product API.
 
 ## Use it
 
-There is **no packaged app** yet. You run the host from this repo. Opening
+There is **no native installer** yet. You run the host from this repo. Opening
 Chrome from the Dock does not start Tyto.
 
 **Full walkthrough:** [docs/USAGE.md](./docs/USAGE.md).
@@ -176,8 +176,9 @@ npm start
 ```
 
 `npm start` listens on `http://127.0.0.1:7420/` (Perch), launches Chrome with
-an **empty** Tyto profile (`~/.tyto/profile`), and opens the goal box. Paste a
-URL and a goal, click **Run**.
+an **empty** Tyto profile (`~/.tyto/profile`), and opens Perch as a **tab in
+that Chrome**. Paste a URL and a goal, click **Go**. Your everyday browser stays
+closed.
 
 You need Chrome or Edge, and a model at `TYTO_BASE_URL` (default Ollama
 `http://127.0.0.1:11434/v1`, model `gpt-oss:20b`). First start writes a host

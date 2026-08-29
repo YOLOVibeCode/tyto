@@ -1,9 +1,10 @@
 import { execFile } from "node:child_process";
 import { resolve } from "node:path";
+import { TytoClient } from "@tyto/sdk";
 import { bootLive, ensureHostToken, persistHostToken } from "./boot.ts";
+import { osOpenPerchEnabled } from "./steer.ts";
 
 function openPerch(url: string): void {
-  if (process.env.TYTO_NO_OPEN === "1") return;
   if (process.platform === "darwin") {
     execFile("open", [url], () => undefined);
     return;
@@ -24,8 +25,10 @@ export async function main(env: NodeJS.ProcessEnv = process.env): Promise<void> 
   }
   const server = await bootLive({ ...env, TYTO_HOST_TOKEN: token, TYTO_LIVE: "1" });
   process.stdout.write(`Tyto is running at ${server.url}\n`);
-  process.stdout.write("Chrome launched with an empty Tyto profile. Paste a URL and a goal, then Run.\n");
-  openPerch(server.url);
+  process.stdout.write("Chrome launched with an empty Tyto profile. Perch is a tab in that window.\n");
+  const client = new TytoClient({ url: server.url, token });
+  await client.call("browser.openSteer", {});
+  if (osOpenPerchEnabled(env)) openPerch(server.url);
   const shutdown = (): void => {
     void server.close().finally(() => process.exit(0));
   };

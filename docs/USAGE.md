@@ -4,7 +4,7 @@ Tyto is in **development**. There is no installer. You run it from a git clone.
 Opening Google Chrome from the Dock does nothing — the **host** has to be running.
 
 You occupy a Chrome or Edge window that **Tyto launches**. You steer it from
-**Perch** (a local page). The site you browse cannot command Tyto.
+**Perch**, a tab in that same window. The site you browse cannot command Tyto.
 
 Operator contract: [SPEC.md](./SPEC.md). This file is the current start path.
 
@@ -12,16 +12,16 @@ Operator contract: [SPEC.md](./SPEC.md). This file is the current start path.
 
 ## What you will see
 
-`npm start` opens **two** windows:
+`npm start` opens **one** Chrome window with two tabs:
 
-| Window | What it is |
+| Tab | What it is |
 |---|---|
 | Perch at `http://127.0.0.1:7420/` | Chat composer, model picker, **Stop**. The steering wheel. |
-| Chrome (empty Tyto profile) | The hands. Pages load and clicks happen here. |
+| Work tab (starts `about:blank`) | The hands. **Go** navigates this tab. Clicks happen here. |
 
-They are not the same window. Perch is usually your default browser; Chrome is
-a separate profile under `~/.tyto/profile` so your everyday cookies stay out of
-the first run.
+They share the empty Tyto profile under `~/.tyto/profile` so your everyday
+browser stays closed. Set `TYTO_STEER=os` if you still want Perch in the OS
+default browser as well.
 
 ---
 
@@ -63,7 +63,7 @@ The first start:
    printed to the terminal)
 2. Listens on `127.0.0.1:7420` (override with `TYTO_PORT`)
 3. Launches Chrome with `--remote-debugging-address=127.0.0.1`
-4. Opens Perch in your default browser
+4. Opens Perch as a tab in that Chrome (not your everyday browser)
 
 Do not commit `.env`. Do not paste the token into chat or tickets.
 
@@ -126,7 +126,8 @@ All optional except a host token (generated on first `npm start`).
 | `TYTO_PROFILE` | `~/.tyto/profile` | Launched browser user-data-dir |
 | `TYTO_SESSION_DIR` | `~/.tyto/sessions` | Session JSON |
 | `TYTO_BROWSER` | `chrome` | `edge` to launch Edge instead |
-| `TYTO_NO_OPEN` | unset | `1` skips opening Perch in the OS browser |
+| `TYTO_NO_OPEN` | unset | With `TYTO_STEER=os`, `1` skips opening Perch in the OS browser |
+| `TYTO_STEER` | Chrome tab | `os` also opens Perch in the OS default browser |
 | `TYTO_LIVE` | set to `1` by `npm start` | Required to spawn Chrome. `npm test` never sets this |
 
 ---
@@ -212,11 +213,17 @@ snapshot. Esc and Stop halt the loop so it stays Idle.
 
 ## What this is not (yet)
 
-- A packaged `Tyto.app` / Windows installer
+- A packaged `Tyto.app` / Windows installer / Homebrew keg
 - "Open my normal Chrome and Tyto is already in it" (ATTACH via `chrome.debugger`
-  auto-attach -- Slice 11; the panel today talks to the LAUNCH host)
+  auto-attach — Slice 11; the panel today talks to the LAUNCH host)
 - Automatic clone of your named Chrome/Edge profile (explicit pick, later)
 - Identity vault restore into the first-run profile
+- A Chrome Web Store listing
+
+CI on `ci-deploy` (and `main`) uploads an unpacked MV3 zip (`tyto-extension`)
+you can **Load unpacked** from `chrome://extensions`. That is the side-panel
+client, not a one-click daily-Chrome install. `npm start` remains the one-browser
+LAUNCH path.
 
 Those are specified. They are not the current start path.
 
@@ -228,6 +235,7 @@ Those are specified. They are not the current start path.
 npm test           # offline, always airplane-mode
 npm run check      # imports + secrets scan + tests + types
 npm run test:e2e   # live E2E: requires Chrome on PATH (sets TYTO_E2E=1 TYTO_LIVE=1)
+npm run package:extension  # copies MV3 files to dist/tyto-extension (+ zip if `zip` exists)
 ```
 
 Product laws: [IMPLEMENTATION.md](./IMPLEMENTATION.md). Do not promote `poc/`

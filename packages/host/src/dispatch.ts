@@ -27,13 +27,15 @@ import type {
   TrustedIntent,
 } from "@tyto/core";
 import { AgentLoop, parseSession, SystemClock } from "@tyto/core";
+import { openSteerTab } from "@tyto/cdp";
 import { isPerchSafeMethod, RPC_ERROR } from "@tyto/protocol";
-import { attachCdpAdapters } from "./attach-cdp.ts";
+import { attachCdpAdapters, cdpFrom } from "./attach-cdp.ts";
 import { record, RpcException } from "./rpc.ts";
 
 export type Runtime = {
   browser: BrowserHandle | undefined;
   loop: AgentLoop | undefined;
+  steerUrl: string;
 };
 
 export type DispatchPorts = {
@@ -95,6 +97,8 @@ export async function dispatch(
       await runtime.browser?.disconnect();
       runtime.browser = undefined;
       return { ok: true };
+    case "browser.openSteer":
+      return browserOpenSteer(runtime);
     case "page.goto":
       return pageGoto(params, ports.allowlist, ports.navigation);
     case "page.snapshot":
@@ -231,6 +235,21 @@ async function browserLaunch(
   });
   await attachCdpAdapters(runtime.browser, ports, runtime);
   return { ok: true };
+}
+
+async function browserOpenSteer(runtime: Runtime): Promise<unknown> {
+  if (!runtime.browser) {
+    throw new RpcException(RPC_ERROR.INTERNAL, "browser not launched");
+  }
+  const cdp = cdpFrom(runtime.browser);
+  if (!cdp) {
+    throw new RpcException(RPC_ERROR.INTERNAL, "browser not launched");
+  }
+  if (!runtime.steerUrl) {
+    throw new RpcException(RPC_ERROR.INTERNAL, "steer url missing");
+  }
+  const { targetId } = await openSteerTab(cdp, new URL(runtime.steerUrl));
+  return { ok: true, targetId };
 }
 
 async function pageGoto(params: unknown, allowlist: Allowlist, navigation: Navigation): Promise<unknown> {

@@ -62,7 +62,7 @@ harvest algorithms from it, do not promote it.
 | Models | `ModelPort` = OpenAI-compatible HTTP adapter + Anthropic adapter. No LiteLLM types | Spec: a proxy is just a URL |
 | Session store | JSON documents on disk (`@tyto/fs`) | Prompt-native; trivial to test with a temp dir |
 | SDK wire | JSON-RPC 2.0 over TCP `127.0.0.1` + bearer token | Same methods for SDK, Perch, MCP adapter |
-| Perch v1 | Local UI that is an SDK client (side panel later) | Session file outlives the UI |
+| Perch v1 | Tab in the launched Chrome (`browser.openSteer`); OS browser opt-in | Session file outlives the UI; side panel is ATTACH |
 | Extension | MV3, Chrome + Edge, native messaging only | ATTACH mode; no `window` command API |
 | Monorepo | npm workspaces | ISP at package boundaries |
 

@@ -8,6 +8,7 @@ export const PERCH_SAFE_METHODS = [
   "profiles.list",
   "browser.launch",
   "browser.disconnect",
+  "browser.openSteer",
   "page.goto",
   "page.snapshot",
   "page.act",

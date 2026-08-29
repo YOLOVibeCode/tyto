@@ -33,7 +33,7 @@ function tapeFrom(observation: Observation | undefined): { push: (kind: TapeEven
   return { push: () => undefined };
 }
 
-function cdpFrom(handle: BrowserHandle): {
+export function cdpFrom(handle: BrowserHandle): {
   send: (method: string, params?: Record<string, unknown>, sessionId?: string) => Promise<unknown>;
   onEvent?: (fn: (method: string, params: unknown) => void) => () => void;
 } | undefined {

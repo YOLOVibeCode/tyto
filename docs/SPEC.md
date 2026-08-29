@@ -304,6 +304,12 @@ Sidebar view of the prompt session: paste, stream, show next recipe,
 interrupt. If Perch dies, the session file does not. Perch is not allowed to
 forward page JS into the SDK as commands.
 
+**LAUNCH** opens Perch as a tab in the launched Chrome (`browser.openSteer` →
+`Target.createTarget` on the loopback host URL). **Go** still navigates the
+work tab. The OS default browser is not the start path (`TYTO_STEER=os` to
+opt in). ATTACH later uses the MV3 side panel in the operator's chosen
+profile.
+
 ### 5.8 Identity vault
 
 The vault is a host-owned kernel service. Perch and MCP see only the status
