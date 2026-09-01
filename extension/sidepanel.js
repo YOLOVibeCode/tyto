@@ -106,6 +106,23 @@ chrome.storage.local.get(["scope"], (r) => {
   if (r.scope === "all") setScope("all");
 });
 
+/* ── attach this tab ──────────────────────────────────────────── */
+$("attach").onclick = async () => {
+  chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+    const tabId = tabs[0]?.id;
+    if (!tabId) {
+      setStatus("no tab");
+      return;
+    }
+    try {
+      await rpc("browser.attach", { tabId: String(tabId) });
+      setStatus("attached");
+    } catch (err) {
+      setStatus(err.message ?? String(err));
+    }
+  });
+};
+
 /* ── send ─────────────────────────────────────────────────────── */
 async function resolveActiveOrigin() {
   return new Promise((resolve) => {

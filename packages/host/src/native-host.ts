@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { createConnection } from "node:net";
 import { dirname, join } from "node:path";
+import { once } from "node:events";
+import { LoopbackBindPolicy } from "@tyto/core";
 
 export const NATIVE_HOST_NAME = "com.noctusoft.tyto";
 
@@ -66,9 +69,14 @@ exec ${shellEscape(opts.execPath)} ${shellEscape(opts.tsxPath)} ${shellEscape(op
   });
 }
 
-export async function writeNativeAuth(path: string, auth: { token: string; port: number }): Promise<void> {
+export async function writeNativeAuth(
+  path: string,
+  auth: { token: string; port: number; bridgePort?: number },
+): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, `${JSON.stringify({ token: auth.token, port: auth.port })}\n`, {
+  const body: { token: string; port: number; bridgePort?: number } = { token: auth.token, port: auth.port };
+  if (auth.bridgePort !== undefined) body.bridgePort = auth.bridgePort;
+  await writeFile(path, `${JSON.stringify(body)}\n`, {
     encoding: "utf8",
     mode: 0o600,
   });
@@ -104,27 +112,55 @@ export async function runNativeStdio(opts: {
   stderr: NodeJS.WritableStream;
   authPath: string;
 }): Promise<void> {
-  let auth: { token: string; port: number };
+  let auth: { token: string; port: number; bridgePort?: number };
   try {
-    const raw = JSON.parse(await readFile(opts.authPath, "utf8")) as { token?: unknown; port?: unknown };
+    const raw = JSON.parse(await readFile(opts.authPath, "utf8")) as {
+      token?: unknown;
+      port?: unknown;
+      bridgePort?: unknown;
+    };
     const token = typeof raw.token === "string" ? raw.token : "";
     const port = typeof raw.port === "number" ? raw.port : Number(raw.port);
     if (token.length < 16 || !Number.isFinite(port)) throw new Error("native auth invalid");
-    auth = { token, port };
+    const bridgePort = typeof raw.bridgePort === "number" ? raw.bridgePort : undefined;
+    auth = bridgePort !== undefined ? { token, port, bridgePort } : { token, port };
   } catch {
     opts.stderr.write("native auth missing\n");
     return;
   }
+
+  let socket: import("node:net").Socket | undefined;
+  if (auth.bridgePort !== undefined) {
+    new LoopbackBindPolicy().assertLoopback("127.0.0.1");
+    socket = createConnection({ host: "127.0.0.1", port: auth.bridgePort });
+    try {
+      await once(socket, "connect");
+    } catch {
+      opts.stderr.write("bridge missing\n");
+      socket = undefined;
+    }
+    socket?.on("data", (chunk: Buffer) => {
+      opts.stdout.write(chunk);
+    });
+  }
+
   let buf = Buffer.alloc(0);
+  let helloDone = false;
   for await (const chunk of opts.stdin) {
     buf = Buffer.concat([buf, chunk as Buffer]);
     while (buf.length >= 4) {
       const n = buf.readUInt32LE(0);
       if (n > 1_000_000) throw new Error("native frame too large");
       if (buf.length < 4 + n) break;
+      const frame = buf.subarray(0, 4 + n);
       const msg = JSON.parse(buf.subarray(4, 4 + n).toString("utf8")) as unknown;
       buf = buf.subarray(4 + n);
-      opts.stdout.write(encodeNativeMessage(nativeHelloReply(msg, auth)));
+      if (!helloDone) {
+        opts.stdout.write(encodeNativeMessage(nativeHelloReply(msg, auth)));
+        helloDone = true;
+        continue;
+      }
+      socket?.write(frame);
     }
   }
 }

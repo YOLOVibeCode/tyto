@@ -6,8 +6,10 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { TytoClient } from "@tyto/sdk";
+import { ExtensionAttacher } from "@tyto/cdp";
 import { composeFromEnv } from "./main.ts";
 import { listen, type HostServer, type ListenConfig } from "./listen.ts";
+import { listenNativeBridge, type NativeBridge } from "./native-bridge.ts";
 import {
   extensionIdFromManifestJson,
   installNativeHost,
@@ -57,14 +59,29 @@ export async function bootLive(
 ): Promise<HostServer> {
   const token = ensureHostToken(env);
   const config = composeFromEnv({ ...env, TYTO_HOST_TOKEN: token }, overrides);
+  let bridge: NativeBridge | undefined;
+  if (config.extensionDir !== undefined && config.extensionDir !== "" && !config.attacher) {
+    bridge = await listenNativeBridge("127.0.0.1");
+    config.attacher = new ExtensionAttacher((msg) => bridge!.post(msg));
+  }
   const server = await listen({ ...config, port: config.port ?? 7420 });
-  const client = new TytoClient({ url: server.url, token: config.token });
+  const closeServer = server.close.bind(server);
+  const wrapped: HostServer = {
+    bind: server.bind,
+    port: server.port,
+    url: server.url,
+    async close() {
+      await bridge?.close();
+      await closeServer();
+    },
+  };
+  const client = new TytoClient({ url: wrapped.url, token: config.token });
   const debugPort =
     env.TYTO_DEBUG_PORT !== undefined && env.TYTO_DEBUG_PORT !== ""
       ? Number(env.TYTO_DEBUG_PORT)
       : await freeLoopbackPort();
   if (!Number.isFinite(debugPort) || debugPort <= 0) {
-    await server.close();
+    await wrapped.close();
     throw new Error("TYTO_DEBUG_PORT invalid");
   }
   const userDataDir = env.TYTO_PROFILE ?? join(homedir(), ".tyto", "profile");
@@ -72,7 +89,9 @@ export async function bootLive(
     await mkdir(userDataDir, { recursive: true });
     if (config.extensionDir !== undefined && config.extensionDir !== "") {
       const authPath = env.TYTO_NATIVE_AUTH ?? join(homedir(), ".tyto", "native-auth.json");
-      await writeNativeAuth(authPath, { token, port: server.port });
+      const auth: { token: string; port: number; bridgePort?: number } = { token, port: wrapped.port };
+      if (bridge) auth.bridgePort = bridge.port;
+      await writeNativeAuth(authPath, auth);
       const browser = env.TYTO_BROWSER === "edge" ? "edge" : "chrome";
       const hostsDir =
         env.TYTO_NATIVE_HOST_DIR !== undefined && env.TYTO_NATIVE_HOST_DIR !== ""
@@ -96,8 +115,8 @@ export async function bootLive(
       port: debugPort,
     });
   } catch (err) {
-    await server.close();
+    await wrapped.close();
     throw err;
   }
-  return server;
+  return wrapped;
 }

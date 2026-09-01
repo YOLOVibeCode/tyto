@@ -10,8 +10,18 @@ export function onPageMessage(_message, _sender) {
 export async function handleNativeMessage(msg, ctx) {
   if (!msg || typeof msg !== "object") return { error: "invalid" };
   if (msg.type === "fromPage") return { ignored: true };
-  if (msg.type !== "cdp") return { error: "unsupported" };
   if (ctx.senderId !== ctx.expectedExtensionId) return { error: "rejected origin" };
+  if (msg.type === "attach") {
+    const tabId = Number(msg.tabId);
+    if (!Number.isFinite(tabId) || tabId <= 0) return { error: "tabId required" };
+    await ctx.attachDebugger(tabId);
+    return { ok: true };
+  }
+  if (msg.type === "detach") {
+    if (typeof ctx.detachDebugger === "function") await ctx.detachDebugger();
+    return { ok: true };
+  }
+  if (msg.type !== "cdp") return { error: "unsupported" };
   if (typeof msg.method !== "string") return { error: "invalid" };
   return ctx.sendCdp(msg.method, msg.params);
 }

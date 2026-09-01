@@ -143,4 +143,8 @@ describe("sidepanel.html structure", () => {
     expect(html).toMatch(/id="scope-tab"/);
     expect(html).toMatch(/id="scope-all"/);
   });
+
+  it("has an Attach button", () => {
+    expect(readExt("sidepanel.html")).toMatch(/id="attach"/);
+  });
 });

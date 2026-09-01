@@ -11,6 +11,7 @@ import type {
   Clock,
   IdentityVault,
   Intent,
+  Attacher,
   Launcher,
   LaunchOpts,
   ModelCatalog,
@@ -64,6 +65,7 @@ export type DispatchPorts = {
   vault?: IdentityVault;
   profiles?: ProfileCatalog;
   launcher?: Launcher;
+  attacher?: Attacher;
   /** Unpacked MV3 dir. Client-supplied browser.launch.extensionDir is ignored. */
   extensionDir?: string;
 };
@@ -102,6 +104,8 @@ export async function dispatch(
       return { ok: true };
     case "browser.openSteer":
       return browserOpenSteer(runtime);
+    case "browser.attach":
+      return browserAttach(params, need(ports.attacher, "attacher"), runtime, ports);
     case "page.goto":
       return pageGoto(params, ports.allowlist, ports.navigation);
     case "page.snapshot":
@@ -257,6 +261,21 @@ async function browserOpenSteer(runtime: Runtime): Promise<unknown> {
   }
   const { targetId } = await openSteerTab(cdp, new URL(runtime.steerUrl));
   return { ok: true, targetId };
+}
+
+async function browserAttach(
+  params: unknown,
+  attacher: Attacher,
+  runtime: Runtime,
+  ports: DispatchPorts,
+): Promise<unknown> {
+  const tabId = String(record(params).tabId ?? "");
+  if (!tabId || tabId === "0") {
+    throw new RpcException(RPC_ERROR.INVALID_PARAMS, "tabId required");
+  }
+  runtime.browser = await attacher.attach({ tabId });
+  await attachCdpAdapters(runtime.browser, ports, runtime);
+  return { ok: true };
 }
 
 async function pageGoto(params: unknown, allowlist: Allowlist, navigation: Navigation): Promise<unknown> {

@@ -28,6 +28,11 @@
     .scope button.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
     select { font: inherit; padding: 0.22rem 0.35rem; border: 1px solid #ccc; border-radius: 4px; background: #fff; }
     #model { max-width: 9rem; font-size: 0.82rem; }
+    #attach {
+      font: 0.78rem inherit; padding: 0.2rem 0.5rem;
+      border: 1px solid #ccc; border-radius: 12px;
+      background: #fff; cursor: pointer; color: #444;
+    }
 
     /* ── transcript ──────────────────────────────────────────────── */
     #transcript {
@@ -80,6 +85,7 @@
   <header>
     <h1>Tyto</h1>
     <select id="model" title="Model"><option value="">loading…</option></select>
+    <button id="attach" type="button" title="Attach debugger to this tab">Attach</button>
     <div class="scope">
       <button id="scope-tab" class="active" title="Act on this tab only">This tab</button>
       <button id="scope-all" title="Act on the focused tab (all tabs)">All tabs</button>

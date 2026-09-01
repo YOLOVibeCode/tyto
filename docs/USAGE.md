@@ -221,6 +221,13 @@ snapshot. Esc and Stop halt the loop so it stays Idle.
 - Automatic clone of your named Chrome/Edge profile (explicit pick, later)
 - Identity vault restore into the first-run profile
 - A Chrome Web Store listing
+- Profile picker before inheriting a daily Chrome's cookies
+- Windows native-host wrapper (`.bat`)
+
+`browser.attach` (tab id required) is the ATTACH RPC: the side panel **Attach**
+button asks the host to debugger-attach that tab via native messaging. LAUNCH
+CDP still works without it. Live attach on a throwaway profile is the remaining
+Slice 11 proof.
 
 CI on `ci-deploy` (and `main`) uploads an unpacked MV3 zip (`tyto-extension`)
 you can **Load unpacked** from `chrome://extensions`. That is the side-panel

@@ -311,6 +311,23 @@ describe("sidepanel.js — Send", () => {
   });
 });
 
+describe("sidepanel.js — Attach", () => {
+  it("Attach sends browser.attach with the active tabId", async () => {
+    const state = mountPanel();
+    await flushPromises();
+    state.sentMessages.length = 0;
+
+    document.getElementById("attach")!.click();
+    await flushPromises();
+    await flushPromises();
+
+    const attachMsg = state.sentMessages.find((m) => m.type === "rpc" && m.method === "browser.attach");
+    expect(attachMsg).toBeDefined();
+    expect((attachMsg?.params as { tabId?: string })?.tabId).toBe("42");
+    expect(document.getElementById("status")?.textContent).toBe("attached");
+  });
+});
+
 describe("sidepanel.js — Stop", () => {
   it("Stop button calls operator.interrupt and shows stopped", async () => {
     const state = mountPanel();

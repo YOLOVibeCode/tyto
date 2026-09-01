@@ -95,4 +95,23 @@ describe("ATTACH extension protocol", () => {
     expect(html).not.toMatch(/sendNativeMessage|hostToken/);
     expect(readFileSync(join(ROOT, "background.js"), "utf8")).toMatch(/seedHostAuth/);
   });
+
+  it("native { type: \"attach\", tabId } auto-attaches debugger; fromPage cannot attach", async () => {
+    const attached: number[] = [];
+    const ctx = {
+      senderId: "tyto.example.extension",
+      expectedExtensionId: "tyto.example.extension",
+      sendCdp: async () => ({ ok: true }),
+      attachDebugger: async (tabId: number) => {
+        attached.push(tabId);
+      },
+    };
+    const out = await handleNativeMessage({ type: "attach", tabId: 17 }, ctx);
+    expect(out).toEqual({ ok: true });
+    expect(attached).toEqual([17]);
+    await expect(handleNativeMessage({ type: "attach" }, ctx)).resolves.toEqual({ error: "tabId required" });
+    const ignored = await handleNativeMessage({ type: "fromPage", tabId: 17 }, ctx);
+    expect(ignored).toEqual({ ignored: true });
+    expect(attached).toEqual([17]);
+  });
 });

@@ -4,25 +4,69 @@
  *
  * Page JS is data, not commands. No exposed global API.
  */
-import { onPageMessage, seedHostAuth } from "./native-protocol.js";
+import { onPageMessage, seedHostAuth, handleNativeMessage, NATIVE_HOST_NAME, autoAttachDebugger } from "./native-protocol.js";
 import { handlePanelMessage, scopeThisTab, scopeAllTabs } from "./sidepanel-sw.js";
 
 /* ── side panel opens on toolbar click ─────────────────────────── */
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 
-seedHostAuth({
-  sendNativeMessage: (host, msg) =>
-    new Promise((resolve, reject) => {
-      chrome.runtime.sendNativeMessage(host, msg, (resp) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
-        }
-        resolve(resp);
-      });
-    }),
-  storage: chrome.storage.session,
-}).catch(() => {});
+function nativeCtx() {
+  return {
+    senderId: chrome.runtime.id,
+    expectedExtensionId: chrome.runtime.id,
+    sendCdp: async (method, params) => {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) throw new Error("no tab");
+      return chrome.debugger.sendCommand({ tabId: tab.id }, method, params ?? {});
+    },
+    attachDebugger: (tabId) => autoAttachDebugger(chrome, tabId),
+    detachDebugger: async () => {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) return;
+      try {
+        await chrome.debugger.detach({ tabId: tab.id });
+      } catch {
+        /* already detached */
+      }
+    },
+  };
+}
+
+try {
+  const nativePort = chrome.runtime.connectNative(NATIVE_HOST_NAME);
+  nativePort.onMessage.addListener((msg) => {
+    if (msg && msg.type === "hello") {
+      const token = String(msg.token ?? "");
+      const hostPort = String(msg.port ?? "");
+      if (token.length >= 16) {
+        chrome.storage.session.set({ hostToken: token, hostPort });
+      }
+      return;
+    }
+    void handleNativeMessage(msg, nativeCtx()).then((result) => {
+      try {
+        nativePort.postMessage(result);
+      } catch {
+        /* disconnected */
+      }
+    });
+  });
+  nativePort.postMessage({ type: "hello" });
+} catch {
+  seedHostAuth({
+    sendNativeMessage: (host, msg) =>
+      new Promise((resolve, reject) => {
+        chrome.runtime.sendNativeMessage(host, msg, (resp) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          resolve(resp);
+        });
+      }),
+    storage: chrome.storage.session,
+  }).catch(() => {});
+}
 
 /* ── ATTACH protocol (native messaging / debugger) ─────────────── */
 chrome.runtime.onMessage.addListener(onPageMessage);
