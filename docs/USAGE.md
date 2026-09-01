@@ -62,8 +62,9 @@ The first start:
 1. Writes a host token into **local** `.env` if none exists (gitignored; never
    printed to the terminal)
 2. Listens on `127.0.0.1:7420` (override with `TYTO_PORT`)
-3. Launches Chrome with `--remote-debugging-address=127.0.0.1`
-4. Opens Perch as a tab in that Chrome (not your everyday browser)
+3. Launches Chrome with `--remote-debugging-address=127.0.0.1` and loads the
+   unpacked Tyto extension
+4. Registers the native messaging host and opens Perch as a tab in that Chrome
 
 Do not commit `.env`. Do not paste the token into chat or tickets.
 
@@ -128,6 +129,9 @@ All optional except a host token (generated on first `npm start`).
 | `TYTO_BROWSER` | `chrome` | `edge` to launch Edge instead |
 | `TYTO_NO_OPEN` | unset | With `TYTO_STEER=os`, `1` skips opening Perch in the OS browser |
 | `TYTO_STEER` | Chrome tab | `os` also opens Perch in the OS default browser |
+| `TYTO_NO_EXTENSION` | unset | `1` skips `--load-extension` and native-host install |
+| `TYTO_NATIVE_HOST_DIR` | Chrome/Edge NativeMessagingHosts | Tests inject a temp dir; do not commit |
+| `TYTO_NATIVE_AUTH` | `~/.tyto/native-auth.json` | Port+token for the native host (mode 0600) |
 | `TYTO_LIVE` | set to `1` by `npm start` | Required to spawn Chrome. `npm test` never sets this |
 
 ---
@@ -165,16 +169,13 @@ Edge. It talks to the running host over loopback — no CDP from the page, no
 
 ### Store the host token in the extension
 
-The extension reads the host token from `chrome.storage.session`. Set it once
-after each browser restart (the host token is in `.env` as `TYTO_HOST_TOKEN`):
+`npm start` registers a native messaging host and the unpacked extension in the
+Tyto Chrome. The service worker asks the host for the loopback port and token
+(`{ type: "hello" }`). You do not paste the token. It stays in
+`chrome.storage.session`, never in the side panel DOM.
 
-Open the Chrome DevTools console on any extension page, then run:
-
-```js
-chrome.storage.session.set({ hostToken: "YOUR_TOKEN", hostPort: "7420" });
-```
-
-Replace `YOUR_TOKEN` with the value from `.env`. **Never commit it.**
+If you load the extension unpacked into a different Chrome (daily profile),
+`npm start` must still be running so the native host can answer hello.
 
 ### Open the side panel
 
@@ -215,7 +216,8 @@ snapshot. Esc and Stop halt the loop so it stays Idle.
 
 - A packaged `Tyto.app` / Windows installer / Homebrew keg
 - "Open my normal Chrome and Tyto is already in it" (ATTACH via `chrome.debugger`
-  auto-attach — Slice 11; the panel today talks to the LAUNCH host)
+  auto-attach — Slice 11 remainder; LAUNCH now loads the extension and seeds
+  the token over native messaging)
 - Automatic clone of your named Chrome/Edge profile (explicit pick, later)
 - Identity vault restore into the first-run profile
 - A Chrome Web Store listing

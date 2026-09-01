@@ -12,5 +12,9 @@ export function chromeLaunchArgs(opts: LaunchOpts): string[] {
   if (opts.authServerAllowlist?.length) {
     args.push(`--auth-server-allowlist=${opts.authServerAllowlist.join(",")}`);
   }
+  if (opts.extensionDir !== undefined && opts.extensionDir !== "") {
+    args.push("--disable-features=DisableLoadExtensionCommandLineSwitch");
+    args.push(`--load-extension=${opts.extensionDir}`);
+  }
   return args;
 }

@@ -19,3 +19,21 @@ export async function handleNativeMessage(msg, ctx) {
 export async function autoAttachDebugger(chrome, tabId) {
   await chrome.debugger.attach({ tabId }, "1.3");
 }
+
+export const NATIVE_HOST_NAME = "com.noctusoft.tyto";
+
+/**
+ * Ask the native host for loopback port + token. Token stays in session storage, never in the panel DOM.
+ * @param {{ sendNativeMessage: (host: string, msg: unknown) => Promise<unknown>, storage: { set(vals: Record<string, string>): Promise<void> } }} deps
+ */
+export async function seedHostAuth(deps) {
+  const reply = await deps.sendNativeMessage(NATIVE_HOST_NAME, { type: "hello" });
+  if (!reply || typeof reply !== "object") return { ok: false };
+  const r = /** @type {Record<string, unknown>} */ (reply);
+  if (r.type !== "hello") return { ok: false };
+  const token = String(r.token ?? "");
+  const port = String(r.port ?? "");
+  if (token.length < 16) return { ok: false };
+  await deps.storage.set({ hostToken: token, hostPort: port });
+  return { ok: true };
+}

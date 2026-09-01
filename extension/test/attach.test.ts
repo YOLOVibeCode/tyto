@@ -68,4 +68,31 @@ describe("ATTACH extension protocol", () => {
     await autoAttachDebugger(chromeFake, 17);
     expect(attached).toEqual([{ tabId: 17, protocol: "1.3" }]);
   });
+
+  it("hello from native host seeds session storage; token never from page", async () => {
+    const stored: Record<string, string> = {};
+    const sent: unknown[] = [];
+    const { seedHostAuth } = await import("../native-protocol.js");
+    const out = await seedHostAuth({
+      sendNativeMessage: async (host: string, msg: unknown) => {
+        sent.push({ host, msg });
+        expect(host).toBe("com.noctusoft.tyto");
+        return { type: "hello", port: "7420", token: "t".repeat(32) };
+      },
+      storage: {
+        set: async (vals: Record<string, string>) => {
+          Object.assign(stored, vals);
+        },
+      },
+    });
+    expect(out).toEqual({ ok: true });
+    expect(sent).toEqual([{ host: "com.noctusoft.tyto", msg: { type: "hello" } }]);
+    expect(stored.hostToken).toBe("t".repeat(32));
+    expect(stored.hostPort).toBe("7420");
+    expect(onPageMessage({ type: "hello", token: "t".repeat(32) }, {})).toBe(false);
+    const html = readFileSync(join(ROOT, "sidepanel.html"), "utf8");
+    expect(html).not.toContain("t".repeat(32));
+    expect(html).not.toMatch(/sendNativeMessage|hostToken/);
+    expect(readFileSync(join(ROOT, "background.js"), "utf8")).toMatch(/seedHostAuth/);
+  });
 });

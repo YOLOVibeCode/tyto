@@ -3,6 +3,7 @@
   "name": "Tyto",
   "version": "0.1.0",
   "description": "AI browser control — side panel + ATTACH mode. The page cannot command Tyto.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtwpRUwjGCEL3SenqVrZPEtb6BkDIlVIwPjPVI6u9lzXCt03cvM84Dzn+OrzP6zO6jHKHuYPq3jRsIZ9RKALoU+JCTYmcvCgvPZialhgUCeqVOXGAfyD6E1lodEhHkK7Pgb7CXE86CrGz2KJipsMmWDdWyaNwjrU5rHs9O7B7O1CfKGTn+BjHmynGFfAcran0bukaInuq/lyCspoEtUm5cGCHO4EUgvu2kwqREYOJRFyZGIqRwsAiyg/5L/oivo70CFlwMvmZnEeS3F0uEqmjYBdi6s9ns73Wqbw+oRV6xUw/8TlXhY19RfGjrqx2bOepuizZM1x7bGedNtkKuoKnBQIDAQAB",
   "permissions": ["nativeMessaging", "debugger", "tabs", "storage", "sidePanel"],
   "host_permissions": [],
   "background": { "service_worker": "background.js", "type": "module" },

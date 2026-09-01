@@ -1,11 +1,19 @@
 import { randomBytes } from "node:crypto";
 import { createServer } from "node:http";
+import { readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { TytoClient } from "@tyto/sdk";
 import { composeFromEnv } from "./main.ts";
 import { listen, type HostServer, type ListenConfig } from "./listen.ts";
+import {
+  extensionIdFromManifestJson,
+  installNativeHost,
+  nativeHostDir,
+  writeNativeAuth,
+} from "./native-host.ts";
 
 export function ensureHostToken(env: Record<string, string | undefined>): string {
   const existing = env.TYTO_HOST_TOKEN ?? "";
@@ -62,6 +70,26 @@ export async function bootLive(
   const userDataDir = env.TYTO_PROFILE ?? join(homedir(), ".tyto", "profile");
   try {
     await mkdir(userDataDir, { recursive: true });
+    if (config.extensionDir !== undefined && config.extensionDir !== "") {
+      const authPath = env.TYTO_NATIVE_AUTH ?? join(homedir(), ".tyto", "native-auth.json");
+      await writeNativeAuth(authPath, { token, port: server.port });
+      const browser = env.TYTO_BROWSER === "edge" ? "edge" : "chrome";
+      const hostsDir =
+        env.TYTO_NATIVE_HOST_DIR !== undefined && env.TYTO_NATIVE_HOST_DIR !== ""
+          ? env.TYTO_NATIVE_HOST_DIR
+          : nativeHostDir(browser, process.platform, homedir());
+      const here = dirname(fileURLToPath(import.meta.url));
+      await installNativeHost({
+        destDir: hostsDir,
+        extensionId: extensionIdFromManifestJson(
+          readFileSync(join(config.extensionDir, "manifest.json"), "utf8"),
+        ),
+        execPath: process.execPath,
+        scriptPath: join(here, "native-host-main.ts"),
+        tsxPath: join(here, "../../../node_modules/tsx/dist/cli.mjs"),
+        authPath,
+      });
+    }
     await client.call("browser.launch", {
       browser: env.TYTO_BROWSER === "edge" ? "edge" : "chrome",
       userDataDir,

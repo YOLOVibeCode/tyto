@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   extractFromAx,
   IdleOccupancy,
@@ -69,6 +70,12 @@ export function composeFromEnv(
     },
     ...overrides,
   };
+  if (env.TYTO_NO_EXTENSION !== "1" && env.TYTO_LIVE === "1" && env.TYTO_E2E !== "1") {
+    const raw = env.TYTO_EXTENSION_DIR;
+    config.extensionDir = resolve(
+      raw !== undefined && raw !== "" ? raw : join(dirname(fileURLToPath(import.meta.url)), "../../../extension"),
+    );
+  }
   if (env.TYTO_PORT !== undefined && env.TYTO_PORT !== "") {
     const port = Number(env.TYTO_PORT);
     if (!Number.isFinite(port) || port < 0) throw new Error("TYTO_PORT invalid");

@@ -242,4 +242,57 @@ describe("host browser.launch attaches CDP adapters", () => {
     expect(nav?.sessionId).toBe("sid-page");
     expect(nav?.params).toMatchObject({ url: "https://example.com/" });
   });
+
+  it("browser.launch ignores client extensionDir and uses the host-configured path", async () => {
+    const http = await serveVersion();
+    const spawned: string[][] = [];
+    let deliver: ((text: string) => void) | undefined;
+    const launcher = new CdpLauncher({
+      resolveBinary: async () => "/bin/chrome-fake",
+      spawn: async (_binary, args) => {
+        spawned.push(args);
+        return { kill: () => undefined };
+      },
+      open: async () => ({
+        send(text) {
+          const req = JSON.parse(text) as { id: number; method: string };
+          const result =
+            req.method === "Target.getTargets"
+              ? { targetInfos: [{ targetId: "page-1", type: "page", url: "about:blank" }] }
+              : req.method === "Target.attachToTarget"
+                ? { sessionId: "sid-page" }
+                : {};
+          queueMicrotask(() => deliver?.(JSON.stringify({ id: req.id, result })));
+        },
+        subscribe(fn) {
+          deliver = fn;
+          return () => {
+            deliver = undefined;
+          };
+        },
+      }),
+    });
+    const server = await listen({
+      bind: "127.0.0.1",
+      port: 0,
+      token: TOKEN,
+      sessions: new MemorySessionStore(),
+      allowlist: new OriginAllowlist(),
+      navigation: new SpyNavigation(),
+      observation: new FakeObservation(),
+      launcher,
+      extensionDir: "/tmp/tyto-extension",
+    });
+    servers.push(server);
+    const client = new TytoClient({ url: server.url, token: TOKEN });
+    await client.call("browser.launch", {
+      browser: "chrome",
+      userDataDir: "/tmp/tyto-profile",
+      port: Number(http.port),
+      extensionDir: "/tmp/evil-extension",
+    });
+    expect(spawned).toHaveLength(1);
+    expect(spawned[0]).toContain("--load-extension=/tmp/tyto-extension");
+    expect(spawned[0]?.join(" ")).not.toMatch(/evil-extension/);
+  });
 });

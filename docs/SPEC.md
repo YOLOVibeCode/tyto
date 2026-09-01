@@ -307,8 +307,9 @@ forward page JS into the SDK as commands.
 **LAUNCH** opens Perch as a tab in the launched Chrome (`browser.openSteer` →
 `Target.createTarget` on the loopback host URL). **Go** still navigates the
 work tab. The OS default browser is not the start path (`TYTO_STEER=os` to
-opt in). ATTACH later uses the MV3 side panel in the operator's chosen
-profile.
+opt in). LAUNCH also `--load-extension`s the MV3 unpacked dir and registers
+a native messaging host so the side panel can seed the loopback token without
+paste. ATTACH to a daily profile still needs an explicit profile pick.
 
 ### 5.8 Identity vault
 

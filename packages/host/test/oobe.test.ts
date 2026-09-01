@@ -121,6 +121,42 @@ describe("out of the box host", () => {
     await expect(client.call("session.list")).resolves.toEqual([]);
   });
 
+  it("bootLive with TYTO_LIVE loads the extension and writes a token-free native host", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tyto-profile-"));
+    const hosts = await mkdtemp(join(tmpdir(), "tyto-nmh-"));
+    const authDir = await mkdtemp(join(tmpdir(), "tyto-auth-"));
+    const launches: LaunchOpts[] = [];
+    const launcher: Launcher = {
+      async launch(opts) {
+        launches.push(opts);
+        return { disconnect: async () => undefined };
+      },
+    };
+    const server = await bootLive(
+      {
+        TYTO_HOST_TOKEN: TOKEN,
+        TYTO_LIVE: "1",
+        TYTO_PORT: "0",
+        TYTO_PROFILE: dir,
+        TYTO_DEBUG_PORT: "9333",
+        TYTO_NATIVE_HOST_DIR: hosts,
+        TYTO_NATIVE_AUTH: join(authDir, "native-auth.json"),
+      },
+      { launcher },
+    );
+    servers.push(server);
+    expect(launches[0]?.extensionDir).toMatch(/extension$/);
+    const raw = await readFile(join(hosts, "com.noctusoft.tyto.json"), "utf8");
+    expect(raw).not.toContain(TOKEN);
+    expect(raw).toContain("chrome-extension://iidndmgmpifgjjagijfcolhoppjfkokl/");
+    const auth = JSON.parse(await readFile(join(authDir, "native-auth.json"), "utf8")) as {
+      token: string;
+      port: number;
+    };
+    expect(auth.token).toBe(TOKEN);
+    expect(auth.port).toBe(server.port);
+  });
+
   it("cookie JSON-RPC matches the Perch form: grant, goto, save, run", async () => {
     const navigation = {
       gotoCalls: 0,

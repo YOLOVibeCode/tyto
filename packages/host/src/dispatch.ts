@@ -12,6 +12,7 @@ import type {
   IdentityVault,
   Intent,
   Launcher,
+  LaunchOpts,
   ModelCatalog,
   ModelPort,
   Navigation,
@@ -63,6 +64,8 @@ export type DispatchPorts = {
   vault?: IdentityVault;
   profiles?: ProfileCatalog;
   launcher?: Launcher;
+  /** Unpacked MV3 dir. Client-supplied browser.launch.extensionDir is ignored. */
+  extensionDir?: string;
 };
 
 function need<T>(port: T | undefined, name: string): T {
@@ -227,12 +230,16 @@ async function browserLaunch(
   ports: DispatchPorts,
 ): Promise<unknown> {
   const p = record(params);
-  runtime.browser = await launcher.launch({
+  const launchOpts: LaunchOpts = {
     browser: p.browser === "edge" ? "edge" : "chrome",
     userDataDir: String(p.userDataDir ?? ""),
     port: Number(p.port ?? 0),
     bindHost: "127.0.0.1",
-  });
+  };
+  if (ports.extensionDir !== undefined && ports.extensionDir !== "") {
+    launchOpts.extensionDir = ports.extensionDir;
+  }
+  runtime.browser = await launcher.launch(launchOpts);
   await attachCdpAdapters(runtime.browser, ports, runtime);
   return { ok: true };
 }

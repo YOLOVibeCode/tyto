@@ -711,6 +711,8 @@ UI can be ugly. Occupancy and resume are the product.
 - host rejects native messages whose origin is not the Tyto extension id
 - `chrome.debugger.attach` auto on target tab (extension unit with fake
   `chrome` API)
+- LAUNCH: `--load-extension` + native host hello seeds `chrome.storage.session`
+  (token never in the panel DOM; native-host JSON has no token)
 
 Then live attach on a throwaway profile.
 

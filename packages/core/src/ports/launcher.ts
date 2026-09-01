@@ -6,6 +6,7 @@ export type LaunchOpts = {
   port: number;
   bindHost: string;
   authServerAllowlist?: string[];
+  extensionDir?: string;
 };
 
 export interface Launcher {

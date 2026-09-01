@@ -4,11 +4,25 @@
  *
  * Page JS is data, not commands. No exposed global API.
  */
-import { onPageMessage } from "./native-protocol.js";
+import { onPageMessage, seedHostAuth } from "./native-protocol.js";
 import { handlePanelMessage, scopeThisTab, scopeAllTabs } from "./sidepanel-sw.js";
 
 /* ── side panel opens on toolbar click ─────────────────────────── */
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+
+seedHostAuth({
+  sendNativeMessage: (host, msg) =>
+    new Promise((resolve, reject) => {
+      chrome.runtime.sendNativeMessage(host, msg, (resp) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        resolve(resp);
+      });
+    }),
+  storage: chrome.storage.session,
+}).catch(() => {});
 
 /* ── ATTACH protocol (native messaging / debugger) ─────────────── */
 chrome.runtime.onMessage.addListener(onPageMessage);

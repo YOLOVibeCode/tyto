@@ -144,6 +144,19 @@ describe("cdp adapter", () => {
     expect(args.join(" ")).not.toMatch(/0\.0\.0\.0/);
   });
 
+  it("chromeLaunchArgs loads unpacked extension and re-enables --load-extension", () => {
+    const args = chromeLaunchArgs({
+      browser: "chrome",
+      userDataDir: "/tmp/tyto-profile",
+      port: 9222,
+      bindHost: "127.0.0.1",
+      extensionDir: "/tmp/tyto-extension",
+    });
+    expect(args).toContain("--load-extension=/tmp/tyto-extension");
+    expect(args.some((a) => a.includes("DisableLoadExtensionCommandLineSwitch"))).toBe(true);
+    expect(args.join(" ")).not.toMatch(/0\.0\.0\.0/);
+  });
+
   it("ProfileCatalog reads Local State fixture names without launching", async () => {
     const catalog = new LocalStateProfileCatalog(join(FIXTURES, "local-state"));
     const profiles = await catalog.list("chrome");
