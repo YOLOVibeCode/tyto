@@ -149,6 +149,9 @@ describe("out of the box host", () => {
     const raw = await readFile(join(hosts, "com.noctusoft.tyto.json"), "utf8");
     expect(raw).not.toContain(TOKEN);
     expect(raw).toContain("chrome-extension://iidndmgmpifgjjagijfcolhoppjfkokl/");
+    const profileHost = await readFile(join(dir, "NativeMessagingHosts", "com.noctusoft.tyto.json"), "utf8");
+    expect(profileHost).toContain("chrome-extension://iidndmgmpifgjjagijfcolhoppjfkokl/");
+    expect(profileHost).not.toContain(TOKEN);
     const auth = JSON.parse(await readFile(join(authDir, "native-auth.json"), "utf8")) as {
       token: string;
       port: number;

@@ -41,6 +41,33 @@ jobs:
           TYTO_HOST_TOKEN: ${{ secrets.TYTO_E2E_TOKEN || 'e2e-ci-token-placeholder-32ch' }}
         run: npx vitest run --config e2e/vitest.config.ts --reporter=verbose e2e/test/live-loop.test.ts e2e/test/vault-live.test.ts e2e/test/weave-live.test.ts
 
+  attach-live:
+    name: "Tier 2 — live attach (throwaway profile)"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Run live attach (headed Chrome for Testing under xvfb)
+        env:
+          TYTO_E2E: "1"
+          TYTO_LIVE: "1"
+          TYTO_HOST_TOKEN: ${{ secrets.TYTO_E2E_TOKEN || 'e2e-ci-token-placeholder-32ch' }}
+        # Branded Google Chrome ignores --load-extension. Chrome for Testing does not.
+        # The MV3 service worker needs a display.
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" npx vitest run --config e2e/vitest.config.ts --reporter=verbose e2e/test/attach-live.test.ts
+
   extension-panel:
     name: "Tier 3 — extension panel (Playwright)"
     runs-on: ubuntu-latest

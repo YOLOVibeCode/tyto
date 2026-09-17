@@ -21,6 +21,8 @@ export type HostServer = {
   readonly bind: string;
   readonly port: number;
   readonly url: string;
+  /** Resolves when the extension native host connects to the loopback bridge. */
+  readonly nativeConnected?: Promise<void>;
   close(): Promise<void>;
 };
 

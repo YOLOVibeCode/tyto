@@ -716,7 +716,7 @@ UI can be ugly. Occupancy and resume are the product.
 - `browser.attach` requires an explicit tab id; extension `{ type: "attach" }`
   calls `chrome.debugger.attach`; host→extension CDP rides a loopback native bridge
 
-Then live attach on a throwaway profile.
+Live attach on a throwaway profile: `e2e/test/attach-live.test.ts` (`TYTO_EXTENSION=1`).
 
 ---
 

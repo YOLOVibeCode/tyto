@@ -120,17 +120,39 @@ const PAGES: Record<string, string> = {
   </script>
 </body>
 </html>`,
+
+  "/attach.html": `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Tyto Attach Fixture</title></head>
+<body>
+  <h1>TytoAttachBeacon</h1>
+  <p>Throwaway profile attach proof.</p>
+</body>
+</html>`,
 };
 
 export type FixtureServer = {
   readonly port: number;
   readonly url: string;
+  waitFor(path: string, timeoutMs?: number): Promise<void>;
   close(): Promise<void>;
 };
 
 export async function startFixtureServer(): Promise<FixtureServer> {
+  const seen = new Set<string>();
+  const waiters = new Map<string, Array<() => void>>();
+
+  const note = (path: string): void => {
+    seen.add(path);
+    const pending = waiters.get(path);
+    if (!pending) return;
+    waiters.delete(path);
+    for (const resume of pending) resume();
+  };
+
   const server: Server = createServer((req, res) => {
     const path = new URL(req.url ?? "/", "http://localhost").pathname;
+    note(path);
     if (handleVaultRoute(req, res, path)) return;
     const html = PAGES[path] ?? PAGES["/result.html"]!;
     res.writeHead(200, {
@@ -152,6 +174,20 @@ export async function startFixtureServer(): Promise<FixtureServer> {
   return {
     port,
     url: `http://127.0.0.1:${port}`,
+    waitFor(path: string, timeoutMs = 45_000): Promise<void> {
+      if (seen.has(path)) return Promise.resolve();
+      return new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          reject(new Error(`fixture ${path} not requested`));
+        }, timeoutMs);
+        const queue = waiters.get(path) ?? [];
+        queue.push(() => {
+          clearTimeout(timer);
+          resolve();
+        });
+        waiters.set(path, queue);
+      });
+    },
     close: () =>
       new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));

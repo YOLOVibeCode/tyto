@@ -20,4 +20,23 @@ describe("host composition root", () => {
     expect(cfg.launcher).toBeDefined();
     expect(cfg.models).toBeDefined();
   });
+
+  it("composeFromEnv skips --load-extension when TYTO_E2E=1", () => {
+    const cfg = composeFromEnv({
+      TYTO_HOST_TOKEN: "t".repeat(32),
+      TYTO_LIVE: "1",
+      TYTO_E2E: "1",
+    });
+    expect(cfg.extensionDir).toBeUndefined();
+  });
+
+  it("composeFromEnv TYTO_EXTENSION=1 loads the extension during e2e", () => {
+    const cfg = composeFromEnv({
+      TYTO_HOST_TOKEN: "t".repeat(32),
+      TYTO_LIVE: "1",
+      TYTO_E2E: "1",
+      TYTO_EXTENSION: "1",
+    });
+    expect(cfg.extensionDir).toMatch(/extension$/);
+  });
 });

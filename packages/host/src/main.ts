@@ -70,7 +70,11 @@ export function composeFromEnv(
     },
     ...overrides,
   };
-  if (env.TYTO_NO_EXTENSION !== "1" && env.TYTO_LIVE === "1" && env.TYTO_E2E !== "1") {
+  if (
+    env.TYTO_NO_EXTENSION !== "1" &&
+    env.TYTO_LIVE === "1" &&
+    (env.TYTO_E2E !== "1" || env.TYTO_EXTENSION === "1")
+  ) {
     const raw = env.TYTO_EXTENSION_DIR;
     config.extensionDir = resolve(
       raw !== undefined && raw !== "" ? raw : join(dirname(fileURLToPath(import.meta.url)), "../../../extension"),

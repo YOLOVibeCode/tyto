@@ -15,6 +15,7 @@ import {
   installNativeHost,
   nativeHostDir,
   writeNativeAuth,
+  loopbackHttpUrl,
 } from "./native-host.ts";
 
 export function ensureHostToken(env: Record<string, string | undefined>): string {
@@ -70,6 +71,7 @@ export async function bootLive(
     bind: server.bind,
     port: server.port,
     url: server.url,
+    ...(bridge !== undefined ? { nativeConnected: bridge.connected } : {}),
     async close() {
       await bridge?.close();
       await closeServer();
@@ -89,8 +91,17 @@ export async function bootLive(
     await mkdir(userDataDir, { recursive: true });
     if (config.extensionDir !== undefined && config.extensionDir !== "") {
       const authPath = env.TYTO_NATIVE_AUTH ?? join(homedir(), ".tyto", "native-auth.json");
-      const auth: { token: string; port: number; bridgePort?: number } = { token, port: wrapped.port };
+      const auth: { token: string; port: number; bridgePort?: number; openUrl?: string } = {
+        token,
+        port: wrapped.port,
+      };
       if (bridge) auth.bridgePort = bridge.port;
+      const requestedOpen = env.TYTO_OPEN_URL;
+      if (requestedOpen !== undefined && requestedOpen !== "") {
+        const openUrl = loopbackHttpUrl(requestedOpen);
+        if (openUrl === undefined) throw new Error("TYTO_OPEN_URL must be http(s) 127.0.0.1");
+        auth.openUrl = openUrl;
+      }
       await writeNativeAuth(authPath, auth);
       const browser = env.TYTO_BROWSER === "edge" ? "edge" : "chrome";
       const hostsDir =
@@ -98,8 +109,7 @@ export async function bootLive(
           ? env.TYTO_NATIVE_HOST_DIR
           : nativeHostDir(browser, process.platform, homedir());
       const here = dirname(fileURLToPath(import.meta.url));
-      await installNativeHost({
-        destDir: hostsDir,
+      const install = {
         extensionId: extensionIdFromManifestJson(
           readFileSync(join(config.extensionDir, "manifest.json"), "utf8"),
         ),
@@ -107,7 +117,11 @@ export async function bootLive(
         scriptPath: join(here, "native-host-main.ts"),
         tsxPath: join(here, "../../../node_modules/tsx/dist/cli.mjs"),
         authPath,
-      });
+      };
+      const dests = new Set([hostsDir, join(userDataDir, "NativeMessagingHosts")]);
+      for (const destDir of dests) {
+        await installNativeHost({ destDir, ...install });
+      }
     }
     await client.call("browser.launch", {
       browser: env.TYTO_BROWSER === "edge" ? "edge" : "chrome",

@@ -130,7 +130,8 @@ All optional except a host token (generated on first `npm start`).
 | `TYTO_NO_OPEN` | unset | With `TYTO_STEER=os`, `1` skips opening Perch in the OS browser |
 | `TYTO_STEER` | Chrome tab | `os` also opens Perch in the OS default browser |
 | `TYTO_NO_EXTENSION` | unset | `1` skips `--load-extension` and native-host install |
-| `TYTO_NATIVE_HOST_DIR` | Chrome/Edge NativeMessagingHosts | Tests inject a temp dir; do not commit |
+| `TYTO_EXTENSION` | unset | `1` loads the extension even when `TYTO_E2E=1` (live attach proof) |
+| `TYTO_NATIVE_HOST_DIR` | Chrome/Edge NativeMessagingHosts | Tests inject a temp dir; `npm start` also writes `NativeMessagingHosts` under the launched user-data-dir so `--user-data-dir` still finds the host |
 | `TYTO_NATIVE_AUTH` | `~/.tyto/native-auth.json` | Port+token for the native host (mode 0600) |
 | `TYTO_LIVE` | set to `1` by `npm start` | Required to spawn Chrome. `npm test` never sets this |
 
@@ -146,7 +147,7 @@ All optional except a host token (generated on first `npm start`).
 | Model dropdown shows "unavailable" | Ollama/proxy down, or wrong `TYTO_BASE_URL` |
 | Perch loads, **Go** says model HTTP error | Wrong `TYTO_MODEL`, or model not pulled in Ollama |
 | `origin not allowed` | Allowlist default-deny; use **Go** from Perch so the typed URL is granted |
-| `browser not launched` | Host up but launch failed; check the terminal from `npm start` |
+| Perch loads, extension missing | Branded Google Chrome ignores `--load-extension`. Use Chrome for Testing, or **Load unpacked** from `chrome://extensions` |
 | Empty snapshot / nothing clicks | Model returned no usable plan, or page is a shell/iframe you have not granted |
 
 `npm test` is airplane-mode. It never launches Chrome and never needs API keys.
@@ -216,8 +217,8 @@ snapshot. Esc and Stop halt the loop so it stays Idle.
 
 - A packaged `Tyto.app` / Windows installer / Homebrew keg
 - "Open my normal Chrome and Tyto is already in it" (ATTACH via `chrome.debugger`
-  auto-attach — Slice 11 remainder; LAUNCH now loads the extension and seeds
-  the token over native messaging)
+  auto-attach — live throwaway-profile proof exists; daily-Chrome sideload is still
+  Load unpacked / `npm start`)
 - Automatic clone of your named Chrome/Edge profile (explicit pick, later)
 - Identity vault restore into the first-run profile
 - A Chrome Web Store listing
@@ -225,9 +226,12 @@ snapshot. Esc and Stop halt the loop so it stays Idle.
 - Windows native-host wrapper (`.bat`)
 
 `browser.attach` (tab id required) is the ATTACH RPC: the side panel **Attach**
-button asks the host to debugger-attach that tab via native messaging. LAUNCH
-CDP still works without it. Live attach on a throwaway profile is the remaining
-Slice 11 proof.
+button asks the host to debugger-attach that tab via native messaging. Live
+attach on a throwaway profile is `e2e/test/attach-live.test.ts` (`TYTO_EXTENSION=1`).
+Playwright cannot click that button on the same Chrome: its page CDP session
+blocks `chrome.debugger.attach`. The live test sends the same RPC the button
+sends, then asserts the accessibility snapshot contains a fixture beacon the
+host never saw any other way. LAUNCH CDP still works without Attach.
 
 CI on `ci-deploy` (and `main`) uploads an unpacked MV3 zip (`tyto-extension`)
 you can **Load unpacked** from `chrome://extensions`. That is the side-panel
@@ -285,6 +289,16 @@ Requires Chrome on `PATH` and `TYTO_E2E=1 TYTO_LIVE=1`.
 captures via `CdpCredentialStore` + the identity vault, quits Chrome, relaunches an
 empty profile, restores, and checks the account page is still authenticated. It then
 greps the session file, tape, model prompt, and vault ciphertext for the cookie value.
+
+`e2e/test/attach-live.test.ts` launches **headed Chrome for Testing** (Playwright's
+Chromium) with `--load-extension` and the native host, without a page CDP session
+(that would block `chrome.debugger.attach`). Branded Google Chrome 137+ ignores
+`--load-extension`, so this proof cannot use the stable Chrome binary.
+`browser.attach` (the Attach button's RPC) debugger-attaches via native messaging;
+`page.snapshot` must contain the fixture beacon. The fixture server independently
+confirms Chrome fetched the page. Existing live-loop tests set
+`TYTO_NO_EXTENSION=1` so they do not install the native host. Nightly CI runs
+this under `xvfb`.
 
 `e2e/test/weave-live.test.ts` types into the search fixture as the operator, then
 asks the agent to fill the same box. Mid-keystroke the operator's text stays.

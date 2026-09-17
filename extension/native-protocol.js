@@ -3,6 +3,18 @@
  * @typedef {{ senderId: string, expectedExtensionId: string, sendCdp: (method: string, params?: unknown) => Promise<unknown> }} NativeCtx
  */
 
+export function loopbackHttpUrl(raw) {
+  if (typeof raw !== "string" || !raw) return "";
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return "";
+    if (url.hostname !== "127.0.0.1") return "";
+    return url.href;
+  } catch {
+    return "";
+  }
+}
+
 export function onPageMessage(_message, _sender) {
   return false;
 }
@@ -27,7 +39,48 @@ export async function handleNativeMessage(msg, ctx) {
 }
 
 export async function autoAttachDebugger(chrome, tabId) {
+  if (typeof chrome.tabs?.get === "function") {
+    const tab = await chrome.tabs.get(tabId);
+    const url = String(tab?.url ?? "");
+    if (!url) throw new Error("tab url not ready");
+    if (!/^https?:/i.test(url)) throw new Error("http(s) tab required");
+  }
   await chrome.debugger.attach({ tabId }, "1.3");
+}
+
+/**
+ * Bind chrome.debugger CDP to the tab Attach selected — not whatever is focused later.
+ * @param {{ debugger: { attach: Function, detach: Function, sendCommand: Function }, tabs?: { get: Function } }} chrome
+ */
+export function createDebuggerSession(chrome) {
+  let attachedTabId;
+  let axEnabled = false;
+  return {
+    attachDebugger: async (tabId) => {
+      await autoAttachDebugger(chrome, tabId);
+      attachedTabId = tabId;
+      axEnabled = false;
+    },
+    detachDebugger: async () => {
+      if (attachedTabId == null) return;
+      const id = attachedTabId;
+      attachedTabId = undefined;
+      axEnabled = false;
+      try {
+        await chrome.debugger.detach({ tabId: id });
+      } catch {
+        /* already detached */
+      }
+    },
+    sendCdp: async (method, params) => {
+      if (attachedTabId == null) throw new Error("not attached");
+      if (!axEnabled) {
+        await chrome.debugger.sendCommand({ tabId: attachedTabId }, "Accessibility.enable");
+        axEnabled = true;
+      }
+      return chrome.debugger.sendCommand({ tabId: attachedTabId }, method, params ?? {});
+    },
+  };
 }
 
 export const NATIVE_HOST_NAME = "com.noctusoft.tyto";

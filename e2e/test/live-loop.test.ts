@@ -54,6 +54,7 @@ describe.skipIf(!LIVE)("live loop — Tyto drives its own fixture pages", () => 
       TYTO_DEBUG_PORT: String(debugPort),
       TYTO_PROFILE: profileDir,
       TYTO_SESSION_DIR: sessionDir,
+      TYTO_NO_EXTENSION: "1",
     };
 
     // spawnBrowser reads process.env.TYTO_LIVE directly; set it for the launcher

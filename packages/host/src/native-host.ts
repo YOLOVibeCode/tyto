@@ -71,11 +71,15 @@ exec ${shellEscape(opts.execPath)} ${shellEscape(opts.tsxPath)} ${shellEscape(op
 
 export async function writeNativeAuth(
   path: string,
-  auth: { token: string; port: number; bridgePort?: number },
+  auth: { token: string; port: number; bridgePort?: number; openUrl?: string },
 ): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
-  const body: { token: string; port: number; bridgePort?: number } = { token: auth.token, port: auth.port };
+  const body: { token: string; port: number; bridgePort?: number; openUrl?: string } = {
+    token: auth.token,
+    port: auth.port,
+  };
   if (auth.bridgePort !== undefined) body.bridgePort = auth.bridgePort;
+  if (auth.openUrl !== undefined && auth.openUrl !== "") body.openUrl = auth.openUrl;
   await writeFile(path, `${JSON.stringify(body)}\n`, {
     encoding: "utf8",
     mode: 0o600,
@@ -83,12 +87,32 @@ export async function writeNativeAuth(
   await chmod(path, 0o600);
 }
 
-export function nativeHelloReply(msg: unknown, auth: { token: string; port: number }): unknown {
+export function nativeHelloReply(
+  msg: unknown,
+  auth: { token: string; port: number; openUrl?: string },
+): unknown {
   if (!msg || typeof msg !== "object" || Array.isArray(msg)) return { error: "invalid" };
   const type = (msg as { type?: unknown }).type;
   if (type === "fromPage") return { ignored: true };
   if (type !== "hello") return { error: "rejected" };
-  return { type: "hello", port: String(auth.port), token: auth.token };
+  const reply: { type: "hello"; port: string; token: string; openUrl?: string } = {
+    type: "hello",
+    port: String(auth.port),
+    token: auth.token,
+  };
+  if (auth.openUrl !== undefined && auth.openUrl !== "") reply.openUrl = auth.openUrl;
+  return reply;
+}
+
+export function loopbackHttpUrl(raw: string): string | undefined {
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    if (url.hostname !== "127.0.0.1") return undefined;
+    return url.href;
+  } catch {
+    return undefined;
+  }
 }
 
 export function encodeNativeMessage(payload: unknown): Buffer {
@@ -112,18 +136,22 @@ export async function runNativeStdio(opts: {
   stderr: NodeJS.WritableStream;
   authPath: string;
 }): Promise<void> {
-  let auth: { token: string; port: number; bridgePort?: number };
+  let auth: { token: string; port: number; bridgePort?: number; openUrl?: string };
   try {
     const raw = JSON.parse(await readFile(opts.authPath, "utf8")) as {
       token?: unknown;
       port?: unknown;
       bridgePort?: unknown;
+      openUrl?: unknown;
     };
     const token = typeof raw.token === "string" ? raw.token : "";
     const port = typeof raw.port === "number" ? raw.port : Number(raw.port);
     if (token.length < 16 || !Number.isFinite(port)) throw new Error("native auth invalid");
     const bridgePort = typeof raw.bridgePort === "number" ? raw.bridgePort : undefined;
-    auth = bridgePort !== undefined ? { token, port, bridgePort } : { token, port };
+    const parsedOpen = typeof raw.openUrl === "string" ? loopbackHttpUrl(raw.openUrl) : undefined;
+    auth = { token, port };
+    if (bridgePort !== undefined) auth.bridgePort = bridgePort;
+    if (parsedOpen !== undefined) auth.openUrl = parsedOpen;
   } catch {
     opts.stderr.write("native auth missing\n");
     return;
@@ -156,7 +184,15 @@ export async function runNativeStdio(opts: {
       const msg = JSON.parse(buf.subarray(4, 4 + n).toString("utf8")) as unknown;
       buf = buf.subarray(4 + n);
       if (!helloDone) {
-        opts.stdout.write(encodeNativeMessage(nativeHelloReply(msg, auth)));
+        const inbound =
+          msg && typeof msg === "object" && !Array.isArray(msg)
+            ? (msg as { type?: unknown }).type
+            : undefined;
+        if (inbound === "fromPage") {
+          opts.stdout.write(encodeNativeMessage({ ignored: true }));
+          continue;
+        }
+        opts.stdout.write(encodeNativeMessage(nativeHelloReply({ type: "hello" }, auth)));
         helloDone = true;
         continue;
       }

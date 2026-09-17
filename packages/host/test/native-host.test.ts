@@ -89,12 +89,68 @@ describe("native messaging host", () => {
     expect(mode).toBe(0o600);
     const reply = nativeHelloReply({ type: "hello" }, { token: TOKEN, port: 7420 });
     expect(reply).toEqual({ type: "hello", port: "7420", token: TOKEN });
+    expect(nativeHelloReply({ type: "hello" }, { token: TOKEN, port: 7420, openUrl: "http://127.0.0.1/x" })).toEqual({
+      type: "hello",
+      port: "7420",
+      token: TOKEN,
+      openUrl: "http://127.0.0.1/x",
+    });
     expect(nativeHelloReply({ type: "fromPage" }, { token: TOKEN, port: 7420 })).toEqual({
       ignored: true,
     });
     expect(nativeHelloReply({ type: "cdp", method: "Runtime.evaluate" }, { token: TOKEN, port: 7420 })).toEqual(
       { error: "rejected" },
     );
+  });
+
+  it("hello reply includes loopback openUrl from native auth", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tyto-auth-"));
+    dirs.push(dir);
+    const authPath = join(dir, "native-auth.json");
+    await writeNativeAuth(authPath, {
+      token: TOKEN,
+      port: 7422,
+      openUrl: "http://127.0.0.1:9/attach.html",
+    });
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    const done = runNativeStdio({ stdin, stdout, stderr, authPath });
+    stdin.write(encodeNativeMessage({ type: "hello" }));
+    stdin.end();
+    const out: Buffer[] = [];
+    stdout.on("data", (c: Buffer) => out.push(c));
+    await done;
+    expect(decodeNativeMessage(Buffer.concat(out))).toEqual({
+      type: "hello",
+      port: "7422",
+      token: TOKEN,
+      openUrl: "http://127.0.0.1:9/attach.html",
+    });
+  });
+
+  it("first native stdin frame always hello-replies so openUrl is not dropped", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tyto-auth-"));
+    dirs.push(dir);
+    const authPath = join(dir, "native-auth.json");
+    await writeNativeAuth(authPath, {
+      token: TOKEN,
+      port: 7423,
+      openUrl: "http://127.0.0.1:9/attach.html",
+    });
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    const done = runNativeStdio({ stdin, stdout, stderr, authPath });
+    stdin.write(encodeNativeMessage({ type: "connect" }));
+    stdin.end();
+    const out: Buffer[] = [];
+    stdout.on("data", (c: Buffer) => out.push(c));
+    await done;
+    expect(decodeNativeMessage(Buffer.concat(out))).toMatchObject({
+      type: "hello",
+      openUrl: "http://127.0.0.1:9/attach.html",
+    });
   });
 
   it("stdio framing is 4-byte little-endian length, not a leaked token on stderr", async () => {

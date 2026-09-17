@@ -62,6 +62,7 @@ describe.skipIf(!LIVE)("identity vault — live cookie session round-trip", () =
       TYTO_DEBUG_PORT: String(debugPort),
       TYTO_PROFILE: profileDir,
       TYTO_SESSION_DIR: sessionDir,
+      TYTO_NO_EXTENSION: "1",
     };
     const server = await bootLive(env, { launcher: e2eLauncher() });
     hostUrl = server.url;

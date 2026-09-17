@@ -243,8 +243,14 @@ async function browserLaunch(
   if (ports.extensionDir !== undefined && ports.extensionDir !== "") {
     launchOpts.extensionDir = ports.extensionDir;
   }
-  runtime.browser = await launcher.launch(launchOpts);
-  await attachCdpAdapters(runtime.browser, ports, runtime);
+  try {
+    runtime.browser = await launcher.launch(launchOpts);
+    await attachCdpAdapters(runtime.browser, ports, runtime);
+  } catch (err) {
+    if (err instanceof RpcException) throw err;
+    const message = err instanceof Error && err.message ? err.message : "launch failed";
+    throw new RpcException(RPC_ERROR.INTERNAL, message);
+  }
   return { ok: true };
 }
 
@@ -273,8 +279,14 @@ async function browserAttach(
   if (!tabId || tabId === "0") {
     throw new RpcException(RPC_ERROR.INVALID_PARAMS, "tabId required");
   }
-  runtime.browser = await attacher.attach({ tabId });
-  await attachCdpAdapters(runtime.browser, ports, runtime);
+  try {
+    runtime.browser = await attacher.attach({ tabId });
+    await attachCdpAdapters(runtime.browser, ports, runtime);
+  } catch (err) {
+    if (err instanceof RpcException) throw err;
+    const message = err instanceof Error && err.message ? err.message : "attach failed";
+    throw new RpcException(RPC_ERROR.INTERNAL, message);
+  }
   return { ok: true };
 }
 

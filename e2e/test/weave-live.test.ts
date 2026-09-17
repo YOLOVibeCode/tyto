@@ -53,6 +53,7 @@ describe.skipIf(!LIVE)("weave occupancy — live", () => {
         TYTO_DEBUG_PORT: String(debugPort),
         TYTO_PROFILE: profileDir,
         TYTO_SESSION_DIR: sessionDir,
+        TYTO_NO_EXTENSION: "1",
       },
       { launcher: e2eLauncher() },
     );

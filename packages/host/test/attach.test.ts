@@ -82,4 +82,26 @@ describe("host browser.attach", () => {
     expect(snap.tree).toContain("Search");
     expect(JSON.stringify(snap)).not.toMatch(/screenshot|data:image/i);
   });
+
+  it("browser.attach surfaces attacher failures instead of a generic internal error", async () => {
+    const attacher: Attacher = {
+      async attach() {
+        throw new Error("extension native port not connected");
+      },
+    };
+    const server = await listen({
+      bind: "127.0.0.1",
+      port: 0,
+      token: TOKEN,
+      sessions: new MemorySessionStore(),
+      allowlist: new OriginAllowlist(),
+      navigation: new SpyNavigation(),
+      attacher,
+    });
+    servers.push(server);
+    const client = new TytoClient({ url: server.url, token: TOKEN });
+    await expect(client.call("browser.attach", { tabId: "17" })).rejects.toThrow(
+      /extension native port not connected/i,
+    );
+  });
 });

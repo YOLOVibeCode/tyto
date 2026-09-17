@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
-import { OriginAllowlist, type Navigation } from "@tyto/core";
+import { OriginAllowlist, type Launcher, type Navigation } from "@tyto/core";
 import { FakeObservation, MemorySessionStore } from "@tyto/core/testing";
 import { CdpLauncher } from "@tyto/cdp";
 import type { CdpTransport } from "@tyto/cdp";
@@ -294,5 +294,27 @@ describe("host browser.launch attaches CDP adapters", () => {
     expect(spawned).toHaveLength(1);
     expect(spawned[0]).toContain("--load-extension=/tmp/tyto-extension");
     expect(spawned[0]?.join(" ")).not.toMatch(/evil-extension/);
+  });
+
+  it("browser.launch surfaces launcher failures instead of a generic internal error", async () => {
+    const launcher: Launcher = {
+      async launch() {
+        throw new Error("chrome exited 1");
+      },
+    };
+    const server = await listen({
+      bind: "127.0.0.1",
+      port: 0,
+      token: TOKEN,
+      sessions: new MemorySessionStore(),
+      allowlist: new OriginAllowlist(),
+      navigation: new SpyNavigation(),
+      launcher,
+    });
+    servers.push(server);
+    const client = new TytoClient({ url: server.url, token: TOKEN });
+    await expect(
+      client.call("browser.launch", { browser: "chrome", userDataDir: "/tmp/x", port: 9 }),
+    ).rejects.toThrow(/chrome exited 1/);
   });
 });

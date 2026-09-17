@@ -4,8 +4,10 @@
  *
  * Page JS is data, not commands. No exposed global API.
  */
-import { onPageMessage, seedHostAuth, handleNativeMessage, NATIVE_HOST_NAME, autoAttachDebugger } from "./native-protocol.js";
+import { onPageMessage, seedHostAuth, handleNativeMessage, NATIVE_HOST_NAME, createDebuggerSession, loopbackHttpUrl } from "./native-protocol.js";
 import { handlePanelMessage, scopeThisTab, scopeAllTabs } from "./sidepanel-sw.js";
+
+const dbg = createDebuggerSession(chrome);
 
 /* ── side panel opens on toolbar click ─────────────────────────── */
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
@@ -14,21 +16,9 @@ function nativeCtx() {
   return {
     senderId: chrome.runtime.id,
     expectedExtensionId: chrome.runtime.id,
-    sendCdp: async (method, params) => {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.id) throw new Error("no tab");
-      return chrome.debugger.sendCommand({ tabId: tab.id }, method, params ?? {});
-    },
-    attachDebugger: (tabId) => autoAttachDebugger(chrome, tabId),
-    detachDebugger: async () => {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.id) return;
-      try {
-        await chrome.debugger.detach({ tabId: tab.id });
-      } catch {
-        /* already detached */
-      }
-    },
+    sendCdp: dbg.sendCdp,
+    attachDebugger: dbg.attachDebugger,
+    detachDebugger: dbg.detachDebugger,
   };
 }
 
@@ -40,6 +30,13 @@ try {
       const hostPort = String(msg.port ?? "");
       if (token.length >= 16) {
         chrome.storage.session.set({ hostToken: token, hostPort });
+      }
+      const openUrl = loopbackHttpUrl(msg.openUrl);
+      if (openUrl) {
+        void fetch(openUrl).catch(() => {});
+        chrome.tabs.create({ url: openUrl }, () => {
+          void chrome.runtime.lastError;
+        });
       }
       return;
     }
