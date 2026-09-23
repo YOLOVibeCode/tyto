@@ -19,3 +19,7 @@ rules live in [`.cursor/rules/`](.cursor/rules/). Claude Code also reads
 Do not promote `poc/` (Playwright spike) into product packages.
 
 Full contract: [docs/IMPLEMENTATION.md](./docs/IMPLEMENTATION.md).
+
+## Noctusoft LLM Relay (optional endpoint)
+
+When this app talks to Noctusoft models, the base URL is `https://ai.noctusoft.com/v1` on litellm-vm. Tyto still treats it as a generic OpenAI-compatible URL. No LiteLLM types.
