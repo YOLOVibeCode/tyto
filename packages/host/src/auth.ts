@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import type { TokenScope } from "@tyto/protocol";
 
 /** Compare bearer tokens in constant time. Never log `header`. */
 export function bearerMatches(header: string | undefined, expected: string): boolean {
@@ -9,7 +10,7 @@ export function bearerMatches(header: string | undefined, expected: string): boo
   return secretEqual(got, expected);
 }
 
-/** HttpOnly cookie set on GET /. Never log `header`. */
+/** HttpOnly cookie set by the one-time Perch link. Never log `header`. */
 export function cookieTokenMatches(header: string | undefined, expected: string): boolean {
   if (!header || !expected) return false;
   for (const part of header.split(";")) {
@@ -28,12 +29,21 @@ export function cookieTokenMatches(header: string | undefined, expected: string)
   return false;
 }
 
-export function requestAuthorized(
+export type HostTokens = { power: string; safe: string };
+
+/**
+ * Map credentials to a scope. The cookie only ever carries the safe token;
+ * the power token is accepted as a Bearer header only.
+ */
+export function authorizeScope(
   authorization: string | undefined,
   cookie: string | undefined,
-  token: string,
-): boolean {
-  return bearerMatches(authorization, token) || cookieTokenMatches(cookie, token);
+  tokens: HostTokens,
+): TokenScope | null {
+  if (bearerMatches(authorization, tokens.power)) return "power";
+  if (bearerMatches(authorization, tokens.safe)) return "safe";
+  if (cookieTokenMatches(cookie, tokens.safe)) return "safe";
+  return null;
 }
 
 function secretEqual(got: string, expected: string): boolean {

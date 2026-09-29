@@ -1,6 +1,6 @@
 # Gitleaks config for a public Tyto repo.
 # Run: gitleaks detect --source . --config .gitleaks.toml
-# CI:  .github/workflows/gitleaks.yml
+# CI:  .github/workflows/ci.yml (gitleaks job)
 
 title = "tyto"
 
@@ -49,4 +49,7 @@ regexes = [
   '''sk-example''',
   '''REDACTED''',
   '''Bearer \[REDACTED\]''',
+  # MV3 manifest "key": an RSA-2048 SubjectPublicKeyInfo that pins the
+  # extension id. It is a public key, not a secret.
+  '''MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA''',
 ]

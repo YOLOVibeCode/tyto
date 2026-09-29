@@ -32,7 +32,7 @@ the first run.
 
 ## Prerequisites
 
-- **Node 24.15+ or 26** (older 22.x fails the jsdom-based UI tests)
+- **Node 22.22+, 24.15+, or 26** (`nvm use` reads `.nvmrc`; older 22.x fails the jsdom-based UI tests)
 - **Google Chrome** or **Microsoft Edge** installed in a normal location
   (`/Applications/Google Chrome.app` on macOS, or on `PATH`)
 - A running **OpenAI-compatible model**. Default:
@@ -54,9 +54,10 @@ git config core.hooksPath .githooks
 npm install
 ```
 
-Optional: copy `.env.example` to `.env` and uncomment / set `TYTO_BASE_URL`,
-`TYTO_MODEL`, and `TYTO_API_KEY` if the endpoint needs a key. Ollama often
-works with an empty key.
+Optional: export `TYTO_BASE_URL`, `TYTO_MODEL`, and `TYTO_API_KEY` (if the
+endpoint needs a key) in your shell. The host does **not** read `.env`; if
+you keep settings there (see `.env.example`), load them with
+`set -a; . ./.env; set +a`. Ollama often works with an empty key.
 
 ```bash
 npm start
@@ -64,15 +65,19 @@ npm start
 
 The first start:
 
-1. Writes a host token into **local** `.env` if none exists (gitignored; never
-   printed to the terminal). Note: the host does **not** read `.env` back, so
-   unless `TYTO_HOST_TOKEN` is exported in your shell, each start uses a fresh
-   token and the one in `.env` goes stale.
-2. Listens on `127.0.0.1:7420` (override with `TYTO_PORT`)
+1. Generates two tokens — **power** (full access, for the coming `tyto` CLI)
+   and **safe** (Perch/MCP) — and writes them to `~/.tyto/tokens/` with mode
+   `0600`, plus `~/.tyto/host.json` (URL, port, pid; no token). Nothing is
+   written to the repo. `TYTO_HOST_TOKEN`, if exported, is used as the power
+   token. Files are removed on Ctrl+C.
+2. Listens on `127.0.0.1:7420` (override with `TYTO_PORT`). Requests with a
+   foreign `Host` or `Origin` are refused.
 3. Launches Chrome with `--remote-debugging-address=127.0.0.1`
-4. Opens Perch in your default browser
+4. Opens Perch in your default browser through a **one-time link** (valid 5
+   minutes) that sets the safe-token cookie. Opening `http://127.0.0.1:7420/`
+   directly shows Perch without a session — restart the host for a new link.
 
-Do not commit `.env`. Do not paste the token into chat or tickets.
+Do not commit `.env`. Do not paste tokens into chat or tickets.
 
 ---
 
@@ -108,7 +113,8 @@ It does **not** grant every origin a page happens to load (iframes, SSO popups).
 
 | Path | What |
 |---|---|
-| `./.env` (repo cwd) | Host token and optional model settings. Gitignored. |
+| `~/.tyto/tokens/{power,safe}` | Host tokens, `0600`, while the host runs. |
+| `~/.tyto/host.json` | Running host URL, port, pid. No token. |
 | `~/.tyto/profile/` | Chrome/Edge user-data-dir for the launched window (empty on first run). |
 | `~/.tyto/sessions/` | Prompt session JSON (goal, plan, last URL, model id). This is the durable object. |
 
@@ -120,14 +126,15 @@ session yet — every **Go** starts a new one (resume is planned as
 
 ## Environment
 
-All optional except a host token (generated on first `npm start`).
+All optional. Export them in your shell — the host does not read `.env`.
 
 | Variable | Default | Role |
 |---|---|---|
 | `TYTO_BASE_URL` | `http://127.0.0.1:11434/v1` | OpenAI-compatible `/v1` |
 | `TYTO_MODEL` | `gpt-oss:20b` | Default model id when session has none |
 | `TYTO_API_KEY` | empty | Sent as Bearer if set |
-| `TYTO_HOST_TOKEN` | generated | Loopback RPC auth; never log it |
+| `TYTO_HOST_TOKEN` | generated per start | Fixed **power** token (tests, CI); never log it |
+| `TYTO_HOME` | `~/.tyto` | Host state and token files |
 | `TYTO_BIND` | `127.0.0.1` | Host bind. `0.0.0.0` is refused |
 | `TYTO_PORT` | `7420` | Perch + JSON-RPC |
 | `TYTO_ALLOW` | empty | Comma-separated origins to seed. Run still grants the URL you type |
@@ -172,8 +179,13 @@ Edge. It talks to the running host over loopback — no CDP from the page, no
 
 ### Store the host token in the extension
 
+> **Deferred.** Since host hardening (Slice 15) the host refuses requests
+> from a `chrome-extension://` origin, so the side panel cannot reach a real
+> host. It only runs in the Tier 3 test, which stubs the host. The CLI replaces
+> it (SPEC draft 2).
+
 The extension reads the host token from `chrome.storage.session`. Set it once
-after each browser restart (the host token is in `.env` as `TYTO_HOST_TOKEN`):
+after each browser restart (the safe token is in `~/.tyto/tokens/safe`):
 
 Open the Chrome DevTools console on any extension page, then run:
 
@@ -181,7 +193,7 @@ Open the Chrome DevTools console on any extension page, then run:
 chrome.storage.session.set({ hostToken: "YOUR_TOKEN", hostPort: "7420" });
 ```
 
-Replace `YOUR_TOKEN` with the value from `.env`. **Never commit it.**
+Replace `YOUR_TOKEN` with the value from `~/.tyto/tokens/safe`. **Never commit it.**
 
 ### Open the side panel
 

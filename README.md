@@ -206,8 +206,9 @@ an **empty** Tyto profile (`~/.tyto/profile`), and opens the goal box. Paste a
 URL and a goal, click **Run**.
 
 You need Chrome or Edge, and a model at `TYTO_BASE_URL` (default Ollama
-`http://127.0.0.1:11434/v1`, model `gpt-oss:20b`). First start writes a host
-token into local `.env` (gitignored). Never commit it.
+`http://127.0.0.1:11434/v1`, model `gpt-oss:20b`). Each start writes fresh
+host tokens to `~/.tyto/tokens/` (`0600`) and opens Perch through a one-time
+link. Nothing is written to the repo.
 
 Kill Perch: session JSON under `~/.tyto/sessions/` remains.
 
@@ -215,7 +216,7 @@ Kill Perch: session JSON under `~/.tyto/sessions/` remains.
 
 ## Develop
 
-Requires **Node 24.15+ or 26** (the jsdom test dependency rejects older 22.x).
+Requires **Node 22.22+, 24.15+, or 26** (`.nvmrc` pins 26; `engine-strict` is on).
 Tests must pass **offline**.
 
 ```bash
@@ -224,8 +225,9 @@ npm run check          # imports + secrets + tests + types
 npm run secrets:scan   # fail closed; does not print secret values
 ```
 
-Copy `.env.example` to `.env` for local models. **Never commit `.env` or
-browser profiles.** `npm test` never launches Chrome.
+Model settings are environment variables (`.env.example` lists them; the host
+does not read `.env` itself). **Never commit `.env` or browser profiles.**
+`npm test` never launches Chrome.
 
 Optional spike (installs Playwright locally; not the product):
 

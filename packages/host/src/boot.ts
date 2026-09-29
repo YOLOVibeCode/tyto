@@ -1,11 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { createServer } from "node:http";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { TytoClient } from "@tyto/sdk";
 import { composeFromEnv } from "./main.ts";
 import { listen, type HostServer, type ListenConfig } from "./listen.ts";
+import { clearHostState, tytoHome, writeHostState } from "./state.ts";
 
 export function ensureHostToken(env: Record<string, string | undefined>): string {
   const existing = env.TYTO_HOST_TOKEN ?? "";
@@ -13,19 +14,6 @@ export function ensureHostToken(env: Record<string, string | undefined>): string
   return randomBytes(32).toString("hex");
 }
 
-export async function persistHostToken(envPath: string, token: string): Promise<"written" | "exists"> {
-  let prev = "";
-  try {
-    prev = await readFile(envPath, "utf8");
-  } catch {
-    prev = "";
-  }
-  if (/(?:^|\n)TYTO_HOST_TOKEN=/m.test(prev)) return "exists";
-  const prefix = prev && !prev.endsWith("\n") ? "\n" : "";
-  const next = `${prev}${prefix}TYTO_HOST_TOKEN=${token}\n`;
-  await writeFile(envPath, next, { encoding: "utf8", mode: 0o600 });
-  return "written";
-}
 
 export async function freeLoopbackPort(): Promise<number> {
   const server = createServer();
@@ -72,4 +60,39 @@ export async function bootLive(
     throw err;
   }
   return server;
+}
+
+export type StartedHost = {
+  readonly server: HostServer;
+  readonly home: string;
+  stop(): Promise<void>;
+};
+
+/**
+ * Start the host and browser, then publish where to find it: host.json (no
+ * token) and 0600 token files under TYTO_HOME. TYTO_HOST_TOKEN, if set, is the
+ * power token; the safe token is always fresh.
+ */
+export async function startHost(
+  env: Record<string, string | undefined>,
+  overrides: Partial<ListenConfig> = {},
+): Promise<StartedHost> {
+  const power = ensureHostToken(env);
+  const safe = randomBytes(32).toString("hex");
+  const home = tytoHome(env);
+  const server = await bootLive({ ...env, TYTO_HOST_TOKEN: power }, { safeToken: safe, ...overrides });
+  try {
+    await writeHostState(home, { url: server.url, port: server.port, pid: process.pid }, { power, safe });
+  } catch (err) {
+    await server.close();
+    throw err;
+  }
+  return {
+    server,
+    home,
+    async stop() {
+      await clearHostState(home);
+      await server.close();
+    },
+  };
 }

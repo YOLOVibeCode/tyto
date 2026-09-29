@@ -834,8 +834,10 @@ token catastrophic.
 - `request with Host other than 127.0.0.1:<port> or localhost:<port> → 421/403`
 - `POST with an Origin that is not the host origin → 403`
 - `token files are written 0600 and host.json contains no token`
-- `body is not read before auth` (401 without consuming a large body)
-- `composition: CDP adapters are built in the root, not in dispatch`
+- `an unauthenticated POST is refused before its body is read`
+- `a one-time Perch link sets the safe token cookie, never the power token; it cannot be reused`
+- `a cookie carrying the power token is not accepted`
+- `startHost writes tokens and host.json under TYTO_HOME and clears them on stop`
 
 ---
 
@@ -875,6 +877,7 @@ The CLI is an SDK client. It imports `@tyto/sdk` and `@tyto/protocol` only.
 - `unknown command → exit 64 with usage`
 - `CLI source imports only @tyto/sdk and @tyto/protocol` (grep test)
 - `tokens and settings come from ~/.tyto, not the repo .env`
+- `composition: CDP adapters are built in the root, not in dispatch`
 
 ---
 

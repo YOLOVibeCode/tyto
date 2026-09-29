@@ -1,6 +1,5 @@
 import { execFile } from "node:child_process";
-import { resolve } from "node:path";
-import { bootLive, ensureHostToken, persistHostToken } from "./boot.ts";
+import { startHost } from "./boot.ts";
 
 function openPerch(url: string): void {
   if (process.env.TYTO_NO_OPEN === "1") return;
@@ -17,17 +16,13 @@ function openPerch(url: string): void {
 
 export async function main(env: NodeJS.ProcessEnv = process.env): Promise<void> {
   process.env.TYTO_LIVE = "1";
-  const generated = !env.TYTO_HOST_TOKEN || env.TYTO_HOST_TOKEN.length < 16;
-  const token = ensureHostToken(env);
-  if (generated) {
-    await persistHostToken(resolve(process.cwd(), ".env"), token);
-  }
-  const server = await bootLive({ ...env, TYTO_HOST_TOKEN: token, TYTO_LIVE: "1" });
-  process.stdout.write(`Tyto is running at ${server.url}\n`);
-  process.stdout.write("Chrome launched with an empty Tyto profile. Paste a URL and a goal, then Run.\n");
-  openPerch(server.url);
+  const started = await startHost({ ...env, TYTO_LIVE: "1" });
+  process.stdout.write(`Tyto is running at ${started.server.url}\n`);
+  process.stdout.write(`Host state and tokens: ${started.home} (tokens are 0600; never share them)\n`);
+  process.stdout.write("Chrome launched with a dedicated Tyto profile. Perch opens with a one-time link.\n");
+  openPerch(started.server.perchLink());
   const shutdown = (): void => {
-    void server.close().finally(() => process.exit(0));
+    void started.stop().finally(() => process.exit(0));
   };
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);

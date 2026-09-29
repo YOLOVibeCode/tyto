@@ -11,7 +11,7 @@ import {
 import { CdpLauncher } from "@tyto/cdp";
 import { FilesystemSessionStore } from "@tyto/fs";
 import { OpenAiCatalog, OpenAiCompatModel } from "@tyto/llm";
-import { listen, type HostServer, type ListenConfig } from "./listen.ts";
+import type { ListenConfig } from "./listen.ts";
 
 class UnlaunchedNavigation implements Navigation {
   async goto(_url: URL): Promise<void> {
@@ -75,8 +75,4 @@ export function composeFromEnv(
     config.port = port;
   }
   return config;
-}
-
-export async function startHost(env: NodeJS.ProcessEnv = process.env): Promise<HostServer> {
-  return listen(composeFromEnv(env));
 }
