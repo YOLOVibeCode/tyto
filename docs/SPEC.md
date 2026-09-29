@@ -1,45 +1,57 @@
 # Tyto — Product specification
 
 Noctusoft, Inc.  
-Status: draft 1 (companion to [`DESIGN.md`](./DESIGN.md))  
+Status: draft 2 — CLI-first, Tyto-owned Chromium (supersedes draft 1’s
+“occupy your existing Chrome/Edge” framing)  
+Design: [`DESIGN.md`](./DESIGN.md)  
 Implementation: [`IMPLEMENTATION.md`](./IMPLEMENTATION.md) — TDD + ISP engineering contract  
-How to run a clone: [`USAGE.md`](./USAGE.md)  
+How to run a clone today: [`USAGE.md`](./USAGE.md)  
 Audience: anyone building, reviewing, or deciding whether to use Tyto
 
 Tyto is a **separate product**. It is not a Scholarmancy feature, not a
-generic “AI Chrome extension,” and not a vision-based computer-use agent.
+browser extension, and not a vision-based computer-use agent.
 
 ---
 
 ## 1. What it is
 
-Tyto is an **AI-first browser control system**. You drive the web in prose
-(a pasted goal, a conversation) the way you drive Claude Code — except the
-hands are on a real Chrome or Edge window, reading the page as a **document**
-(accessibility tree), not as a **screenshot**.
+Tyto is an **AI-first browser you control from the command line.** It
+provisions its own pinned Chromium, launches it with a dedicated profile,
+and exposes everything DevTools can see and do — pages, frames, input,
+console, network, cookies, storage — as first-class commands. A human, a
+script, or an AI agent drives it the same way.
 
-Three properties are load-bearing:
+You do not install an extension to let AI into a browser. The plumbing is
+the product.
 
-1. **Prompt-native.** The durable object is the prompt session (goal, plan,
-   conversation, recipes, answers, last URL). Perch, Claude Code, and the
-   browser are views and hands. Kill the sidebar or the tab: the work remains.
-2. **Native occupancy.** You and the agent share the browser. You click and
-   type at any time. It yields and re-reads. No screenshot lag. No “possessed
-   tab” that you cannot touch.
-3. **Full control, closed exterior.** Internally, Tyto has 100% CDP (every
-   DevTools-class capability needed to operate a page). Externally — the page,
-   other extensions, the public internet — **cannot** issue those commands.
-   The only door is a **local SDK** (token on `127.0.0.1`).
-4. **If you can use it, Tyto can use it.** Anything you can reach and operate
-   in that Chrome/Edge profile — top-level page, iframe/OOPIF, DHTML, JS-
-   injected SPA, shadow tree, popup, or a host that reverse-proxies / injects
-   another app — Tyto must be able to perceive and act on **the same
-   document**, programmatically, with trusted input. Delivery mechanism is
-   not a special case. If your hands work and Tyto’s do not, that is a bug.
-5. **Identity continuity.** Staying logged in is part of “using” a site.
-   The browser profile contains the session; the vault makes it durable.
-   Runs survive restarts; re-auth is silent where the IdP session is warm.
-   Auth material is encrypted, per-origin, and never reaches the model.
+Load-bearing properties:
+
+1. **Out of the box.** `tyto start` downloads a pinned Chromium on first
+   run, launches it with a dedicated persistent profile, and opens the
+   DevTools socket on loopback. No existing Chrome/Edge is required. No
+   extension. No store.
+2. **The command line is first-class.** Every capability is a `tyto`
+   command with `--json` output: navigate, snapshot, click, type, extract,
+   logs, network, cookies, storage, tabs, and raw CDP. Claude Code or any
+   script drives the browser by shelling out to it.
+3. **Full access for the owner.** The DevTools protocol is not hidden behind
+   a narrow API. The owner’s CLI holds a **power token** and can read and
+   write everything the browser holds. Secret values (cookie values,
+   auth headers) are **masked unless `--reveal`** so they do not leak into
+   an agent transcript by accident.
+4. **Document, not screenshot.** Perception is the accessibility tree.
+   Action is trusted CDP `Input`. Waits are page signals, not sleeps.
+5. **Prompt-native.** Goal runs persist as a session document on disk
+   (goal, plan, conversation, recipes, answers, last URL). Kill the CLI,
+   the host, or the browser: the work remains.
+6. **Shared occupancy.** The launched browser is a normal headed window.
+   You can click and type in it at any time; the agent yields and re-reads.
+7. **If you can use it, Tyto can use it.** Top-level page, iframe/OOPIF,
+   DHTML, SPA shell, shadow tree, popup, reverse proxy — same ports, same
+   trusted input, on the document you would have used.
+8. **Closed exterior.** The only door is the local host on `127.0.0.1` with
+   a token. Page JavaScript cannot command Tyto. Nothing listens on a
+   public interface.
 
 Hunt in the dark: the owl hears the tree, it does not photograph the field.
 
@@ -49,300 +61,269 @@ Hunt in the dark: the owl hears the tree, it does not photograph the field.
 
 | Actor | Role |
 |---|---|
-| **Operator** | You. Paste goals, interrupt, take the keyboard, pick a Chrome/Edge profile, confirm destructive actions. |
-| **Host** | Native Tyto process on the machine (macOS, Windows, Linux). Kernel: sessions, token, allowlist, launch/attach. |
-| **SDK client** | Perch, Claude Code (MCP), scripts, later other local apps. Speaks only to the host. |
-| **Browser** | Google Chrome or Microsoft Edge. Launch (Tyto spawns it) or Attach (extension + auto debugger on a running browser). |
-| **Model** | Any OpenAI-compatible (or Anthropic) endpoint you configure. Tyto does not hardcode a vendor or LiteLLM. |
+| **Operator** | You. Start the browser, run commands or goals, take the keyboard, confirm destructive agent actions. |
+| **CLI** (`tyto`) | The primary client. Holds the **power** token. Every browser capability. |
+| **Agent** | Claude Code, a script, CI. Drives Tyto through the CLI (`--json`) or MCP. |
+| **Host** | Local daemon. Owns the browser process, tokens, sessions, allowlist, confirm-gates. |
+| **Browser** | **Tyto Chromium** — a pinned Chrome for Testing build that Tyto downloads. Installed Chrome/Edge is an optional override. |
+| **Model** | Any OpenAI-compatible (or Anthropic) endpoint you configure, used by `tyto run`. No vendor or LiteLLM types. |
+| **Safe clients** | Perch (web view) and the MCP adapter. **Safe** token, `PERCH_SAFE_METHODS` only. |
 
-Not an actor: JavaScript on a website, a remote SaaS “drive my Chrome,”
-another browser extension.
+Not an actor: JavaScript on a website, another extension, a remote service.
 
 ---
 
-## 3. Proper use cases
+## 3. Use cases
 
-These are in-scope. If a request is not on this list, it is not why Tyto
-exists — even if the engine could be abused to do it.
+### 3.1 Drive the browser from a shell (primary)
 
-### 3.1 Interactive operator (primary)
+```bash
+tyto start
+tyto open https://en.wikipedia.org
+tyto snapshot
+tyto type "Search Wikipedia" "barn owl" --enter
+tyto extract "conservation status"
+tyto logs --follow
+tyto cookies --url https://en.wikipedia.org
+tyto cdp Page.captureScreenshot '{"format":"png"}' > page.json
+```
 
-You are in the browser, working. You paste a goal. Tyto plans once, acts
-with trusted input, waits on real page signals (navigation, injected HTML),
-and stays out of your way when you type.
+Deterministic primitives. Role + accessible name, not CSS selectors. Refs
+from `snapshot` are valid for that snapshot only.
 
-Examples:
+### 3.2 An AI agent as the driver
 
-- Research: “Open the barn owl article and extract conservation status.”
-- Ops: “Go to this invoice page and download the CSV.”
-- Forms: “Fill this form from the notes in the prompt; stop before Submit.”
-- Weave: you fill the name and address; Tyto does the rest of the wizard.
-- Resume: you quit Edge, open Tyto, same prompt, continue from last URL.
+Claude Code (or any agent) runs `tyto … --json` from its shell tool, or
+connects over MCP. Same host, same browser, same session file. The agent
+sees masked secrets unless the operator’s command says `--reveal`.
 
-Success looks like a native power user: seconds of thinking, milliseconds of
-clicking, no photograph of the screen per step.
+### 3.3 Goal runs
 
-### 3.2 Claude Code as a second pair of hands
+```bash
+tyto run "open the barn owl article and tell me its conservation status"
+```
 
-Same session document. You paste in the terminal or in Perch. One host, one
-Chrome/Edge, one file. Losing the MCP connection does not delete the prompt.
+Tyto plans once, acts with trusted input, waits on real page signals, and
+writes the answer into the session. Known steps (recipes) replay with no
+model call. `tyto resume <session>` continues after a restart.
 
-### 3.3 Repeatable local recipes
+### 3.4 Full observability
+
+Everything a power user glances at in DevTools, as data:
+
+- console messages and uncaught exceptions
+- navigations, frame attach/detach, DOM inject events
+- network requests and responses (URL, method, status, timing, headers),
+  failures, and response bodies on demand
+- cookies (including httpOnly) and local/session storage
+
+Live (`--follow`) and recorded (session tape). Recorded tape is redacted
+before it is written.
+
+### 3.5 Staying logged in
+
+The Tyto profile persists at `~/.tyto/profiles/<name>`. Log in once by hand
+in the Tyto window; the profile keeps the session across restarts like any
+browser. Multiple named profiles separate work from personal.
+
+### 3.6 Repeatable recipes
 
 After a successful run, the session stores **recipes** (role + accessible
-name + landmark), not CDP node ids. Next time the same origin appears, Tyto
-replays without calling the model. That is how it becomes faster than you.
+name + landmark + frame origin), not CDP node ids. Next time the same
+origin appears, Tyto replays without calling the model.
 
-### 3.4 Authenticated work in *your* profiles (explicit)
+### 3.7 Static vs dynamic pages
 
-You pick a Chrome or Edge profile (e.g. work vs personal). Launch clones or
-opens it with a debug port; Attach uses the live browser via the extension.
-You stay logged into the sites that profile already has — **because you
-opted into that profile**, not because Tyto scraped your OS silently.
-
-Proper: “Use Edge profile Ambient for this session.”  
-Improper: unattended agent on the profile that holds payroll, TEA, or bank
-cookies with a wide allowlist and no confirm-gates.
-
-### 3.5 Static vs dynamic pages
-
-- **Static HTML** (old sites, Wayback identity captures, server-rendered
-  articles): classify `static`, snapshot AX, extract. No inject wait.
-- **Injected HTML** (React shells, `#root`, hydration): wait until the tree
-  grows; if it stays a shell, **fail closed** — do not invent data.
-
-### 3.6 Observability while operating
-
-Console, exceptions, navigations, failed scripts — a DevTools-class tape so
-you (and the planner) know whether the page moved, without a screenshot.
-Broken 2008 Wikipedia JS on Wayback is noise; a `TypeError` after your click
-is signal.
-
-### 3.7 Unattended local runs (secondary, later)
-
-A saved session/recipe with exit codes, domain allowlist, and confirm policy
-(fail or skip destructive steps). CI-style on a machine you own. Not a
-cloud browser farm in v1.
+- **Static HTML**: classify `static`, snapshot AX, extract.
+- **Injected HTML** (React shells, hydration): wait until the tree grows;
+  if it stays a shell, **fail closed** — do not invent data.
 
 ### 3.8 Whatever you can reach (iframe, DHTML, inject, proxy)
 
-Workday-on-a-portal is one instance of a general rule: **human-reachable
-in this profile ⇒ Tyto-reachable through the SDK.**
-
-The document may arrive as:
+**Human-reachable in this profile ⇒ Tyto-reachable.**
 
 | How it shows up | What Tyto does |
 |---|---|
-| Top-level navigation | `goto` / you type the URL; snapshot that target |
+| Top-level navigation | `open` / `goto`; snapshot that target |
 | iframe / OOPIF | Auto-attach; focus the working frame; click in **that** session |
 | DHTML / `innerHTML` / hydrate / CSR | Classify shell vs injected; `waitReady` on **that frame**; fail closed if still empty |
-| Shadow DOM / web components | Pierce; AX is truth, not `page.evaluate` of light DOM |
+| Shadow DOM / web components | AX is truth, not `page.evaluate` of light DOM |
 | Popup / new tab (SSO, print) | Related targets; yield for MFA; then operate the app target |
-| Reverse proxy / vanity host / injected proxy | Still one or more Chromium documents. Same ports. No “proxy driver.” |
+| Reverse proxy / vanity host | Still one or more Chromium documents. Same ports. No “proxy driver.” |
 
 There is no Workday package, no DHTML package, no proxy package. There is
-`FrameGraph` + `Readiness` + trusted `Actuation` on whatever target you
-could have used yourself.
+`FrameGraph` + `Readiness` + trusted `Actuation`.
 
-Limits that still apply: allowlist (you grant origins), confirm-gates,
-page text is data, no screenshot loop unless the thing is actually
-pictorial (canvas/WebGL). “I can see it” includes those — pictorial
-fallback is the exception, not the default.
+### 3.9 Unattended local runs
 
-### 3.9 Identity continuity (browser-scoped)
+A saved session/recipe with exit codes, allowlist, and confirm policy
+(fail or skip destructive steps). On a machine you own. Not a cloud farm.
 
-You can use any authenticated site in your profile. Tyto can too — and
-it must stay logged in across restarts so the prompt-native promise is real
-on authenticated sites.
+### 3.10 Your everyday Chrome/Edge (deferred)
 
-The vault identifies how each allowed origin authenticates, captures the
-browser-scoped session material, caches it encrypted at rest, and restores
-it silently when the session resumes.
-
-**Auth methods Tyto identifies and preserves:**
-
-| Method | What is captured | How re-auth works |
-|---|---|---|
-| Cookie session | `Set-Cookie` sessions (incl. httpOnly, via CDP) | Re-inject cookies before `goto` |
-| OAuth / OIDC bearer | Token in localStorage / sessionStorage / IndexedDB | Re-inject; refresh if expiring |
-| SAML SSO chain | SP + IdP session cookies | Warm IdP session first; SP auto-redirects |
-| Negotiate / Kerberos / IWA | Nothing captured — handled by the real profile | Ensure LAUNCH flags allow IWA; yield for MFA |
-
-**Rules:**
-
-- Per-origin grant, default-deny. Discovering an origin through the frame
-  graph does not grant it vault access.
-- Confirm-gate on first capture of any origin and on restore of sensitive
-  origins (payment, HR, identity provider).
-- Expiry-aware: detect dead or expiring bundles and prompt the operator for
-  re-auth rather than replaying a session that will 401.
-- ATTACH mode already inherits the live profile's cookies. Vault capture
-  there is observation, not escalation — but the consent notice still applies.
-- Auth material is **never** in the session JSON, never in the tape, never
-  in a model prompt, never in git. The session references a vault handle.
-- The vault's data-encryption key is stored in the OS keychain, not on disk.
-
-**Improper:** unattended vault restore on payroll/HR with no confirm-gates
-and a wide grant. Shared-machine vault without a host authentication layer.
+Occupying an already-running Chrome/Edge profile (ATTACH: extension +
+`chrome.debugger` + native messaging) and the encrypted identity vault are
+**deferred, optional** features. Nothing in §3.1–3.9 depends on them. They
+are specified in §5.12–5.13 so they can return without a redesign.
 
 ---
 
-## 4. Out of scope (do not build these as Tyto)
+## 4. Out of scope
 
 | Not Tyto | Why |
 |---|---|
-| Vision-first computer use (screenshot every step) | That is the latency we exist to kill. Pictorial fallback only for canvas/WebGL/image-only. |
-| Consumer AI browser (Comet/Neon) | We do not replace Chrome/Edge; we occupy them. |
-| Chrome Web Store extension that works *without* the host | Then the page or the store sandbox owns you. Extension is a hand of the host. |
-| Remote “drive my home browser from the cloud” | Exterior stays local unless a later spec adds explicit remote auth. |
-| Scholarmancy LMS sync product | Sibling; may borrow `waitReady` / `snapshot`. Different customer. |
-| Firefox as a first-class CDP peer | Chromium CDP is the contract. |
-| Stealth / anti-detect browser for abuse | Trusted input exists so *real* UI works (file pickers), not to evade banks. |
-| Unattended purchasing, wire transfers, production deploys | Confirm-gates; human-in-loop. |
+| Vision-first computer use (screenshot every step) | The latency we exist to kill. Pictorial fallback only for canvas/WebGL/image-only. |
+| A Chromium fork / custom browser build | Pinned upstream Chrome for Testing + flags is enough. A fork is a build farm and a patch treadmill. |
+| A consumer browsing UI (tabs bar, omnibox, sync) | Chromium already has one. Tyto is the control plane. |
+| Extension-required control | The extension is optional and deferred. The CLI needs no extension. |
+| Remote “drive my browser from the cloud” | Exterior stays loopback unless a later spec adds explicit remote auth. |
+| Firefox / Safari as CDP peers | Chromium CDP is the contract. |
+| Stealth / anti-detect for abuse | Trusted input exists so real UI works, not to evade fraud checks. |
+| Unattended purchasing, wire transfers, production deploys by the agent | Confirm-gates; human-in-loop. |
 | Treating page text as instructions | Prompt injection. |
-| OS credential-store / Kerberos TGT extraction | Out of scope. Negotiate/IWA is handled by operating the real profile; no ticket harvesting. |
-| Identity export to non-browser clients | Auth material stays inside the browser boundary. The SDK does not hand cookies to scripts. |
-| Impersonation / delegated identity | Acting as a different principal. Not built. A future design would require separate authorization architecture. |
-| Shared vault across multiple operator accounts | One vault per operator-machine pair; no multi-tenant credential store in v1. |
+| OS credential-store / Kerberos TGT extraction | Out of scope. |
+| Impersonation / multi-tenant credential store | Not built. |
 
 ---
 
 ## 5. Functional specification
 
-### 5.1 Prompt session (source of truth)
+### 5.1 Browser provisioning
 
-A session is a document on disk (host-managed), not memory in an extension.
+- The repo pins one **Chrome for Testing** version (and per-platform
+  download + checksum) in a tracked file. Bumping it is a reviewed commit.
+- `tyto start` (or `tyto browser install`) downloads that build to
+  `~/.tyto/browsers/<version>/<platform>/` on first use, verifies the
+  checksum, and extracts it. A failed or mismatched download leaves nothing
+  half-installed. No auto-update.
+- Platforms: `mac-arm64`, `mac-x64`, `linux64`, `win64`.
+- Override: `--browser chrome|edge|<path>` launches an installed binary
+  instead. Same flags, same ports.
+- Launch flags: `--remote-debugging-address=127.0.0.1`,
+  `--remote-debugging-port=0` (read `DevToolsActivePort`),
+  `--user-data-dir=~/.tyto/profiles/<name>`, `--no-first-run`,
+  `--no-default-browser-check`. Headed by default; `--headless` optional.
 
-Must persist:
+### 5.2 Host daemon and CLI
 
-- Goal and full conversation
-- Plan: steps completed vs remaining
-- Recipes / anchors (role, name, landmark, origin, route pattern)
-- Extracts / answers
-- Last URL and tab intent
-- Model settings used (provider id + model id, not the raw key)
-- Allowlist and confirm policy for that session
+- `tyto start [--profile <name>] [--headless] [--browser …]` starts the
+  host daemon and the browser. `tyto stop`, `tyto status`.
+- The daemon writes `~/.tyto/host.json` (port, pid — **no token**) and the
+  tokens to `~/.tyto/tokens/` with mode `0600`.
+- The CLI reads those files, calls the host over JSON-RPC on loopback, and
+  prints human output by default, `--json` on request (NDJSON for streams).
+- Exit codes are stable and documented (0 ok, 1 error, 2 shell not ready,
+  3 allowlist deny, 4 confirm required, 64 usage, 69 host not running).
 
-Must not persist:
+| Group | Commands |
+|---|---|
+| Lifecycle | `start`, `stop`, `status`, `browser install\|path\|version` |
+| Pages | `open`, `back`, `reload`, `tabs`, `tab new\|close\|focus`, `frames` |
+| Perception | `snapshot`, `extract`, `classify`, `wait` |
+| Action | `click`, `type`, `press`, `scroll`, `select` (trusted input, role + name) |
+| Observability | `logs [--follow] [--kind console\|network\|exception\|nav]`, `network`, `network body <id>` |
+| State | `cookies [list\|set\|delete\|clear]`, `storage local\|session <origin>` |
+| Escape hatch | `cdp <Domain.method> [params-json] [--target <id>]`, `cdp events <Domain…>` |
+| Goals | `run "<goal>"`, `resume <session>`, `sessions`, `stop-run` |
+| Policy | `allow <origin>`, `allowlist` |
 
-- `ref_N`, `backendNodeId`, click coordinates
-- Live CDP sockets, extension ports
-- Screenshots (except optional operator-debug attachments)
+### 5.3 Protocol surfaces and token scopes
 
-Resume: open session → launch/attach → `goto` last URL → BROWSE → bind
-remaining recipes → continue.
+One JSON-RPC host, two method sets, two tokens:
 
-### 5.2 Control modes
+| Scope | Token holder | Methods |
+|---|---|---|
+| **safe** | Perch, MCP | `PERCH_SAFE_METHODS` (sessions, goto, snapshot, act, extract, frames, tape, operator, models, `identity.status`). No raw CDP, no cookie or storage values. |
+| **power** | CLI | `PERCH_SAFE_METHODS` ∪ `POWER_METHODS` (`cdp.send`, CDP event stream, cookies, storage, network bodies, tabs). |
 
-**LAUNCH.** Host starts Chrome or Edge with a chosen `user-data-dir` and
-`--remote-debugging-port` bound to `127.0.0.1`. Full CDP. Prefer profile
-clone so the user’s daily Chrome can stay open.
+A safe token calling a power method is `unauthorized`. The power token is
+never served over HTTP; it exists only in the `0600` token file.
 
-**ATTACH.** Tyto extension in running Chrome/Edge. Auto-enables the debugger
-on the target tab (100% CDP). Speaks to the host **only** via native
-messaging. Debugger banner is accepted in this mode as the cost of occupying
-a live everyday profile.
+### 5.4 Observability (tape)
 
-Both modes expose the **same SDK**. The operator does not learn two APIs.
+CDP events are always on for the launched browser: console, exceptions,
+lifecycle, navigation, frame attach/detach, network request/response/
+failure. The host keeps a bounded in-memory tape and appends goal-run tape
+to the session. `Redactor` runs **before** tape is persisted or returned.
+The power surface can return raw values only with `reveal: true`, and raw
+values are never written to disk.
 
-### 5.3 SDK (only exterior)
+### 5.5 Cookies and storage
 
-The SDK is the only supported way to drive Tyto from “outside” the host:
+- `cookies` lists the jar (all origins, or `--url`), including httpOnly,
+  via CDP — never `document.cookie`.
+- Values are masked (`name`, `domain`, `path`, `expires`, flags shown;
+  `value` → `‹redacted›`) unless `--reveal`.
+- `set`, `delete`, `clear` write through CDP.
+- `storage local|session <origin>` reads DOM storage, masked the same way.
 
-- TypeScript first
-- MCP as a thin adapter for Claude Code
-- Python later if needed
+### 5.6 Raw CDP
 
-Capabilities (logical; not a screenshot API):
+`tyto cdp <Domain.method> [params]` sends any protocol method to the
+browser or a chosen target and prints the result. `tyto cdp events` streams
+events. Results pass through the redactor’s structured masking (cookie
+values, `Cookie` / `Set-Cookie` / `Authorization` headers) unless
+`--reveal`. This is the owner’s escape hatch: allowlist and confirm-gates
+govern the **agent**, not the owner’s explicit commands.
 
-- List/select Chrome and Edge profiles
-- Launch / attach / disconnect
-- Tabs, frames, OOPIFs (auto-attach; snapshot and act **per frame origin**)
-- Discover cross-origin frames; **do not** auto-grant them
-- `classify` / `waitReady` (static vs shell vs injected) **per frame**
-- `snapshot` (compact AX + ephemeral refs)
-- `act` (trusted click/type/keys)
-- `extract` (AX first, JS read, model only if the tree actually contains the field)
-- Tape: console, nav, exceptions, network errors, DOM inject events
-- Interrupt / yield to operator
-- Read/write prompt session
+### 5.7 Prompt session (source of truth for goal runs)
 
-The SDK authenticates with a **host token**. It does not listen on a public
-interface.
+Must persist: goal and conversation (including the assistant’s replies),
+plan (done vs remaining), recipes, extracts/answers, last URL, model id +
+base URL (never the key), allowlist and confirm policy.
 
-### 5.4 Perception and action
+Must not persist: `ref_N`, `backendNodeId`, coordinates, live sockets,
+cookie or token values, screenshots (except operator-debug attachments).
+
+Resume: open session → start/attach browser → `goto` last URL → browse →
+bind remaining recipes → continue.
+
+### 5.8 Perception and action
 
 | Step | Behavior |
 |---|---|
-| Observe | CDP events always on. Debugger *stepping* off unless inspecting a failure. |
-| Classify | `static` / `shell` / `injected` from HTML+AX+main text, not from `load` alone. |
+| Observe | CDP events always on. Debugger stepping off. |
+| Classify | `static` / `shell` / `injected` from HTML + AX + main text. |
 | Browse | Compact AX **per focused frame**; refs valid for this snapshot only. |
 | Think | Model, rare. Emits recipes, not node ids. |
-| Act | Trusted `Input` by default. JS click is degraded mode. |
+| Act | Trusted `Input`. JS click is degraded mode. |
 | Wait | Nav, lifecycle, mutation/AX growth — not `sleep(250)`. |
 | Extract | Fail closed if still a shell. |
 
-Screenshots: only if the chosen node (or page) has no useful AX.
+### 5.9 Weave (operator occupancy)
 
-### 5.5 Weave (operator occupancy)
+- Real operator key/mouse input pauses agent dispatch.
+- `tyto stop-run` / Esc aborts the current act and drops ephemeral refs.
+- Operator-edited fields are truth; the next browse sees them.
+- The occupancy signal must not be callable by page JavaScript.
 
-- Any real key/mouse from the operator pauses agent dispatch.
-- Esc / Stop aborts the current act and drops ephemeral refs.
-- Operator-edited fields are truth; the next BROWSE sees them.
-- Agent never clicks “on top of” the operator.
+### 5.10 Models
 
-### 5.6 Models
+`baseUrl` + API key + model id. Discover via `GET /v1/models` when
+supported; a typed model id always works. No LiteLLM code paths.
 
-- Configure `baseUrl` + API key + model id.
-- Discover via `GET /v1/models` when the endpoint supports it.
-- Manual model id always works.
-- No LiteLLM-specific code paths. A LiteLLM proxy is just another URL.
+### 5.11 Perch (optional view)
 
-### 5.7 Perch
+A local page on the host showing sessions: goal box, transcript, Stop. Safe
+scope only. If Perch dies, the session file does not.
 
-Sidebar view of the prompt session: paste, stream, show next recipe,
-interrupt. If Perch dies, the session file does not. Perch is not allowed to
-forward page JS into the SDK as commands.
+### 5.12 Identity vault (deferred, optional)
 
-### 5.8 Identity vault
+The persistent Tyto profile is the primary way to stay logged in. The vault
+adds portability (restore a captured session into a fresh profile).
 
-The vault is a host-owned kernel service. Perch and MCP see only the status
-method (is an origin authenticated, fresh or expiring). They never receive
-raw cookies, tokens, or vault handles that could be forwarded.
+- Per-origin grant, default-deny; confirm on first capture and on restore
+  of sensitive origins.
+- Capture via CDP, AES-GCM at rest, DEK in the OS keychain.
+- Expiry-aware; never replay an expired bundle.
+- Never in session JSON, tape, model prompts, or git. Safe clients see
+  `identity.status` only.
 
-**Lifecycle:**
+### 5.13 ATTACH to an existing Chrome/Edge (deferred, optional)
 
-1. **Identify** — `AuthProfiler` classifies each allowed origin:
-   `cookieSession | oauthBearer | samlSso | oidc | negotiateIWA | clientCert | unknown`.
-   Classification is from observed network events and storage (no heuristic
-   page-text analysis). The profile is stored in the session doc as metadata,
-   not as a secret.
-
-2. **Capture** — operator confirms (once per origin). `CredentialStorePort`
-   reads cookies via `Network.getAllCookies` (catches httpOnly), reads token
-   stores via `Storage.getDOMStorageItems` / `IndexedDB.requestData`. Bundles
-   are AES-GCM encrypted; the DEK lives in the OS keychain.
-
-3. **Preserve** — `IdentityBundle` on disk: ciphertext + origin + auth method
-   + expiry hint + IdP dependency list. No plaintext. No cookies in the session
-   JSON or in any log.
-
-4. **Restore** — on session resume, vault decrypts and re-injects: cookies via
-   `Network.setCookies`, storage via `Storage.setDOMStorageItem`. For SSO
-   chains the IdP origin is restored first. For Negotiate/IWA origins, ensure
-   LAUNCH flags (`--auth-server-allowlist`) permit the host, then `goto`.
-
-5. **Expiry / rotation** — `auth/expiry` checks bundle age vs expiry hint.
-   `expiring` → proactive re-capture prompt. `expired` → yield to operator,
-   do not proceed until re-authed. Do not replay a dead session at a 401.
-
-6. **Forget** — explicit operator command. Deletes ciphertext and removes DEK
-   reference in keychain. Does not log what was deleted.
-
-**Redaction:** `Redactor` strips all cookie header shapes, bearer-token
-shapes, and active vault values from any string before it goes to tape or
-to `ModelPort`. The model never learns the auth material and cannot be
-prompted to reveal it.
+Extension auto-enables `chrome.debugger` on a chosen tab and speaks to the
+host only via native messaging. Same method sets. The UI must state that
+ATTACH inherits that profile’s cookies before connecting.
 
 ---
 
@@ -352,24 +333,18 @@ CDP input is indistinguishable from a human. Policy lives in the host.
 
 | Rule | Requirement |
 |---|---|
-| Bind | Debug port and SDK: `127.0.0.1` only |
-| Auth | Host token required for SDK |
-| Page | No command channel from document JS |
-| Extension | Native messaging to host only; no `window` API for control |
-| Profile | Explicit pick; empty Tyto profile is default |
-| Allowlist | Default-deny **origins**. Grant portal, tenant, and IdP separately. Iframe discovery never auto-grants. |
-| Frames | Auto-attach OOPIFs. Act only in an allowed, attached frame. Parent shell is not a substitute for the child tree. |
-| Destructive | Confirm submit / purchase / delete / send |
+| Bind | Host and debug port on `127.0.0.1` only |
+| Host header | Reject requests whose `Host` is not the loopback address + port (DNS rebinding) |
+| Origin | Reject browser requests whose `Origin` is not the host’s own origin |
+| Tokens | Two scopes (safe, power). Constant-time compare. Never logged. Power token only in a `0600` file |
+| Perch | Receives the safe scope only, and never by an unauthenticated request |
+| Page | No command channel from document JS (no `window` API, no page-callable bindings) |
+| Profile | Dedicated Tyto profile by default; named profiles explicit |
+| Allowlist | Default-deny origins **for the agent**. Iframe discovery never auto-grants |
+| Destructive | Agent must confirm submit / purchase / delete / send |
 | Injection | Page content is data, never instructions |
-| Secrets | API keys in host/OS keychain, never in the page, never in git |
-| Auth material | Vault ciphertext on disk; DEK in OS keychain; never in session JSON, tape, model prompt, or git |
-| Identity grant | Default-deny per origin. Explicit operator confirm on first capture and on sensitive-origin restore. |
-| Expiry | Detect and prompt. Never silently replay an expired bundle. |
-| Redaction | `Redactor` strips cookies and tokens from all tape and model inputs. |
-
-ATTACH on a live profile **inherits that profile’s cookies**. The UI must
-say so before connect. The vault consent notice is required even in ATTACH
-mode before any capture occurs.
+| Secrets | Masked on every surface unless the power client asks `reveal: true`. Never persisted raw. Never sent to `ModelPort` |
+| Model keys | Host env / OS keychain; never in the page, the session, or git |
 
 ---
 
@@ -378,55 +353,51 @@ mode before any capture occurs.
 | | v1 |
 |---|---|
 | OS | macOS, Windows, Linux |
-| Browsers | Google Chrome, Microsoft Edge (Chromium, CDP) |
-| Clients | SDK, Perch, MCP |
-| Not v1 | Firefox, Safari, remote hosted browsers |
+| Browser | Tyto Chromium (pinned Chrome for Testing). Installed Chrome/Edge as override |
+| Clients | CLI (power), MCP and Perch (safe), TypeScript SDK |
+| Not v1 | Firefox, Safari, remote hosted browsers, ATTACH, identity vault |
 
 ---
 
 ## 8. Quality bars (when it is “Tyto”)
 
-- Paste-to-first-trusted-click is obviously faster than a screenshot agent
-  on a normal HTML page.
-- Closing Perch or disconnecting MCP does not lose the prompt session.
-- A static Wayback article classifies `static` and extracts from AX without
-  a model inventing facts.
-- A CSR shell either becomes `injected` with real content or extract **blocks**.
-- A portal that embeds Workday (or any tenant) in a cross-origin iframe:
-  Tyto attaches the child, snapshots **that** origin, and does not treat
-  the parent chrome as the app.
-- A site cannot `postMessage` Tyto into navigating or submitting.
-- Operator can type in the same field the agent was about to fill.
-- The agent resumes on an authenticated site after a browser restart without
-  the operator re-typing a password — and the model conversation contains no
-  cookie, token, or credential value.
+- On a machine with only Node: `tyto start` brings up a browser with no
+  extension and no preinstalled Chrome.
+- Anything visible in DevTools (console, network, cookies, storage, any CDP
+  method) is reachable from `tyto` with `--json`.
+- `tyto cookies --json` shows the jar with values masked; `--reveal` shows
+  them; neither writes a value to disk.
+- Paste-to-first-trusted-click is obviously faster than a screenshot agent.
+- Killing the CLI, the host, or the browser does not lose a goal session.
+- A static article classifies `static` and extracts from AX without a model
+  inventing facts. A CSR shell either becomes `injected` or extract blocks.
+- A portal embedding a tenant in a cross-origin iframe: Tyto attaches the
+  child, snapshots **that** origin, and does not treat the parent as the app.
+- A site cannot `postMessage` or call a binding to steer, stop, or grant Tyto.
+- The operator can type in the same field the agent was about to fill.
 
 ---
 
 ## 9. Build order
 
-1. Host + SDK + disk sessions + LAUNCH (Chrome/Edge) + loop + Perch paste + interrupt.
-2. ATTACH: extension, auto debugger, native messaging, profile picker.
-3. MCP client on the same session file.
-4. Weave + recipe replay.
-5. Unattended runner with exit codes.
-
-Proof points already exercised in-repo (`poc/`): AX loop, tape, inject-wait,
-fail-closed extract, Wayback 2008 static success. Those are engine spikes,
-not the product UI.
+1. Harden the host: token scopes, Host/Origin checks, token files.
+2. Chromium provisioning (pinned Chrome for Testing).
+3. `tyto` CLI + daemon + primitives.
+4. Power surface: raw CDP, cookies, storage, network, event streams.
+5. Agent loop completeness: replies, re-observe after act, confirm-gate,
+   recipes, resume.
+6. MCP server on the safe surface.
+7. Unattended runner live.
+8. Later: ATTACH, identity vault.
 
 ---
 
 ## 10. One-line tests
 
-- If a power user would rather use a vision agent than paste into Perch,
-  Tyto is not done.
-- If they quit the browser and cannot reopen the **same prompt** and
-  continue, Tyto is not done.
-- If a website can drive the SDK, Tyto is not done.
-- If they cannot operate whatever they can operate by hand in that
-  profile (iframe, DHTML, injected app, proxied host), Tyto is not done.
-- If they quit the browser and the model transcript from the resumed run
-  contains a cookie or token value, Tyto is not done.
-- If an origin gets vault access without an explicit operator grant,
-  Tyto is not done.
+- If you must install an extension to let AI drive the browser, Tyto is not done.
+- If DevTools can see it and `tyto` cannot, Tyto is not done.
+- If a power user would rather screenshot-agent the tab, Tyto is not done.
+- If they quit the browser and cannot resume the **same session**, Tyto is not done.
+- If a website can drive the host, Tyto is not done.
+- If a cookie or token value lands in an agent transcript or on disk without
+  an explicit `--reveal`, Tyto is not done.

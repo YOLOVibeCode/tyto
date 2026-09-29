@@ -3,7 +3,10 @@
 Noctusoft, Inc.  
 Companion to [`SPEC.md`](./SPEC.md) and [`DESIGN.md`](./DESIGN.md)  
 Operator start path: [`USAGE.md`](./USAGE.md)  
-Status: draft 1 — this is the engineering contract
+Status: draft 2 — this is the engineering contract. Draft 2 re-aims the
+product at a CLI-first, Tyto-owned Chromium (SPEC draft 2). Slices 0–14 are
+unchanged history; Slices 15–19 are the new work. ATTACH (Slice 11) and the
+identity vault (Slice 9b) are deferred, not deleted.
 
 This plan is how we build the spec without growing a god object or a
 Playwright script with a chat box glued on. **Tests define behavior. Ports
@@ -40,7 +43,9 @@ harvest algorithms from it, do not promote it.
 
 ### Control plane (from the spec)
 
-- SDK / debug: `127.0.0.1` + token only.
+- SDK / debug: `127.0.0.1` + token only. Two token scopes: **safe**
+  (Perch, MCP) and **power** (CLI). Secret values are masked unless a power
+  call asks `reveal: true`.
 - Page JS is data, never a command channel.
 - Default-deny allowlist. Explicit profile. Confirm on destructive acts.
 - Prompt session on disk is source of truth.
@@ -65,6 +70,9 @@ harvest algorithms from it, do not promote it.
 | Perch v1 | Local UI that is an SDK client (side panel later) | Session file outlives the UI |
 | Extension | MV3, Chrome + Edge, native messaging only | ATTACH mode; no `window` command API |
 | Monorepo | npm workspaces | ISP at package boundaries |
+| Browser | Pinned **Chrome for Testing**, downloaded by Tyto (`@tyto/chromium`). Installed Chrome/Edge is an override | Out of the box, no auto-update drift, `--load-extension` still allowed, no fork |
+| Primary client | `@tyto/cli`, bin `tyto`, power scope, `--json` everywhere | The command line is first-class; agents shell out to it |
+| Token scopes | `safe` → `PERCH_SAFE_METHODS`; `power` → safe ∪ `POWER_METHODS` | Full access for the owner without widening Perch/MCP |
 
 Playwright may remain in `poc/` until the first live adapter is green. It
 must not appear in `packages/core` or in default CI.
@@ -74,9 +82,10 @@ must not appear in `packages/core` or in default CI.
 ## 2. Package map (dependency direction)
 
 ```
-@tyto/sdk  ──┐
+@tyto/cli  ──┐    (power scope)
+@tyto/sdk  ──┤
 @tyto/mcp  ──┼──►  @tyto/protocol  (JSON-RPC types only)
-@tyto/perch ─┘         │
+@tyto/perch ─┘         │           (mcp + perch: safe scope)
                        ▼
                   @tyto/host  ──wires──►  adapters
                        │
@@ -91,8 +100,10 @@ must not appear in `packages/core` or in default CI.
 @tyto/fs      implements SessionStore, RecipeArchive
 @tyto/secrets implements SecretStore (OS keychain; memory fake in tests)
               IdentityVault (encryption layer + DEK via SecretStore)
-@tyto/cdp     also implements CredentialStorePort
-extension/    native-messaging peer of host (not imported by core)
+@tyto/cdp     also implements CredentialStorePort, CookieJar,
+              DomStorageReader, NetworkBodies, CdpEvents
+@tyto/chromium implements BrowserProvisioner (download, verify, extract)
+extension/    native-messaging peer of host (deferred; not imported by core)
 ```
 
 **Forbidden imports**
@@ -104,9 +115,13 @@ extension/    native-messaging peer of host (not imported by core)
 | `@tyto/mcp` | cdp, RawCdp method names, CredentialStorePort |
 | Perch / MCP surfaces | VaultHandle, RawCookie, RawStorageItems |
 | `@tyto/perch` | cdp |
+| `@tyto/cli` | cdp, host, core adapters — only `@tyto/sdk` + `@tyto/protocol` |
+| `@tyto/chromium` | cdp, host, llm |
 | adapters | each other, except host composition root |
 
-The **composition root** is `packages/host/src/main.ts` only.
+The **composition root** is `packages/host/src/main.ts` only. (Draft-1 code
+also builds CDP adapters in `attach-cdp.ts` after launch; Slice 15 folds that
+back into the root.)
 
 ---
 
@@ -361,6 +376,54 @@ interface Redactor {
 - `AuthProfiler` is pure and has no network call; the adapter feeds it
   recorded `AuthEvidence` (request headers, storage keys, cookie names).
 
+### 3.8 Provisioning and the power surface (draft 2)
+
+```ts
+// BrowserProvisioner — @tyto/chromium. Fetch and extract are injected
+// sub-ports so `npm test` never touches the network.
+interface BrowserProvisioner {
+  installed(pin: ChromiumPin, platform: Platform): Promise<BrowserBinary | null>;
+  ensure(pin: ChromiumPin, platform: Platform): Promise<BrowserBinary>; // download once, verify, extract
+}
+// ChromiumPin = { version, downloads: Record<Platform, { url, sha256 }> } — tracked file
+// Platform = "mac-arm64" | "mac-x64" | "linux64" | "win64"
+
+// CookieJar — the browser's jar (all origins). Not the vault's
+// CredentialStorePort; the owner's CLI reads it, masked by default.
+interface CookieJar {
+  list(filter?: { urls?: string[] }): Promise<CookieRecord[]>;
+  set(cookies: CookieRecord[]): Promise<void>;
+  delete(match: CookieMatch): Promise<void>;
+  clear(): Promise<void>;
+}
+
+interface DomStorageReader {
+  read(origin: Origin, kind: "local" | "session"): Promise<StorageEntry[]>;
+}
+
+interface NetworkBodies {
+  body(requestId: string): Promise<{ body: string; base64: boolean } | null>;
+}
+
+interface CdpEvents {
+  subscribe(domains: string[], fn: (e: CdpEvent) => void): Unsubscribe;
+}
+
+// Redactor gains structured masking for power results:
+//   mask(value: unknown): unknown   // cookie `value`, Cookie/Set-Cookie/Authorization headers
+```
+
+**ISP rules for the power surface:**
+
+- `POWER_METHODS` lives in `@tyto/protocol` next to `PERCH_SAFE_METHODS` and
+  is disjoint from it. MCP tool list and Perch still equal the safe set.
+- `RawCdpPort`, `CookieJar`, `DomStorageReader`, `NetworkBodies`, and
+  `CdpEvents` are wired only into power-scope dispatch.
+- Every power result passes through `Redactor.mask` unless the request says
+  `reveal: true`. Revealed values are returned, never persisted.
+- Owner commands (power scope) are not subject to the agent allowlist or
+  confirm-gate. `AgentLoop` always is.
+
 ---
 
 ## 4. Domain modules (pure)
@@ -398,16 +461,21 @@ They contain the product brain.
 ## 5. Test layers
 
 ```
-npm test              → unit + fake loop          < 2s, no Chrome
-npm test:contract     → adapters vs fixtures      no live browser
-npm test:live         → TYTO_LIVE=1 real Chrome   optional
-npm test:security     → bind, token, allowlist    unit + contract
+npm test              → unit + contract + fake loop    no Chrome, no network, no keys
+npm run test:e2e      → TYTO_E2E=1 TYTO_LIVE=1 real browser   optional, nightly
 ```
+
+Contract (recorded CDP) and security tests run inside `npm test`; there are
+no separate `test:contract` / `test:security` scripts.
 
 Naming: `describe("bind")` / `it("refuses a ref from a previous snapshot")`.
 Test names are spec sentences.
 
 Fixtures live in `packages/core/fixtures/` and `packages/cdp/fixtures/`:
+
+Status: only `ax/react-shell.json`, `ax/wikipedia-search.json`, and
+`local-state/chrome.json` exist today (under `packages/cdp/fixtures/`). The
+rest are owed; DoD item 3 needs the Wayback fixture.
 
 | Fixture | Use |
 |---|---|
@@ -701,7 +769,10 @@ UI can be ugly. Occupancy and resume are the product.
 
 ---
 
-### Slice 11 — ATTACH (extension + native messaging)
+### Slice 11 — ATTACH (extension + native messaging) — deferred
+
+Deferred by SPEC draft 2 (§3.10). Prior work lives on the `ci-deploy`
+branch and is not on `main`.
 
 **Tests first (protocol)**
 
@@ -745,8 +816,99 @@ Then live attach on a throwaway profile.
 - exit 0 on `done`
 - exit 2 on `ShellNotReady`
 - exit 3 on allowlist deny
-- exit 4 on confirm required and `--no-confirm`
+- exit 4 on confirm required (the default; there is no `--no-confirm` flag)
 - no HITL in runner unless `--allow-confirm-fail`
+
+---
+
+### Slice 15 — host hardening and token scopes
+
+Prerequisite for the power surface: raw CDP and cookies make a leaked
+token catastrophic.
+
+**Tests (write first)**
+
+- `GET / never returns a token in Set-Cookie or body to an unauthenticated request`
+- `safe token calling a POWER_METHODS method → unauthorized, adapter spy 0`
+- `power token may call safe and power methods`
+- `request with Host other than 127.0.0.1:<port> or localhost:<port> → 421/403`
+- `POST with an Origin that is not the host origin → 403`
+- `token files are written 0600 and host.json contains no token`
+- `body is not read before auth` (401 without consuming a large body)
+- `composition: CDP adapters are built in the root, not in dispatch`
+
+---
+
+### Slice 16 — Chromium provisioning (`@tyto/chromium`)
+
+**Tests (write first; fake fetch + fake extract, tmp dir)**
+
+- `pin resolves the download URL for mac-arm64, mac-x64, linux64, win64`
+- `ensure downloads once; second ensure is a cache hit (fetch spy 0)`
+- `checksum mismatch fails closed and leaves no version directory`
+- `interrupted extract leaves no version directory`
+- `installed returns the executable path per platform`
+- `launcher prefers the provisioned binary; --browser chrome uses the installed one`
+- `launch args: --remote-debugging-address=127.0.0.1, dedicated user-data-dir, no-first-run`
+- `win64 executable discovery uses chrome.exe and ; PATH separator`
+
+Live (opt-in): `tyto browser install` then launch, `Browser.getVersion`
+matches the pin.
+
+---
+
+### Slice 17 — `tyto` CLI and daemon (`@tyto/cli`)
+
+The CLI is an SDK client. It imports `@tyto/sdk` and `@tyto/protocol` only.
+
+**Tests (write first; host over loopback with fakes)**
+
+- `tyto start writes host.json (port, pid) and returns when the host answers`
+- `tyto start when already running reports the running host, exit 0`
+- `tyto status with no host → exit 69`
+- `tyto open <url> grants that origin, then page.goto`
+- `tyto snapshot --json prints the compact tree and generation`
+- `tyto click "Search" --role button binds role+name then trusted page.act`
+- `tyto type <name> <text> --enter fills then presses Enter`
+- `tyto run "<goal>" writes a session, runs, prints the assistant reply`
+- `every command supports --json and prints one JSON document (NDJSON for streams)`
+- `unknown command → exit 64 with usage`
+- `CLI source imports only @tyto/sdk and @tyto/protocol` (grep test)
+- `tokens and settings come from ~/.tyto, not the repo .env`
+
+---
+
+### Slice 18 — power surface
+
+**Tests (write first; recorded CDP wire)**
+
+- `POWER_METHODS is disjoint from PERCH_SAFE_METHODS; MCP tools unchanged`
+- `cookies.list masks value by default; reveal:true returns it`
+- `cookies.list includes httpOnly cookies via CDP, never document.cookie`
+- `cookies.set / delete / clear send the Storage/Network CDP methods`
+- `storage.read masks values by default`
+- `cdp.send forwards any Domain.method (browser or target session)`
+- `cdp.send result masks cookie values and Cookie/Set-Cookie/Authorization headers unless reveal`
+- `network tape records request/response/failure metadata; headers redacted before persist`
+- `network.body fetches Network.getResponseBody on demand`
+- `cdp events stream delivers subscribed domains only; unsubscribe on client close`
+- `revealed values never appear in session JSON or persisted tape` (grep)
+
+---
+
+### Slice 19 — agent loop completeness
+
+**Tests (write first; fakes)**
+
+- `run appends an assistant message with the answer or failure reason`
+- `after an act, the loop waits on tape then re-snapshots; old refs do not bind`
+- `AgentLoop consults Allowlist and ConfirmGate before every perform`
+- `confirm required with no operator → exit 4 / Failed, Actuation spy 0`
+- `successful steps are remembered as recipes (role, name, origin), never node ids`
+- `second run on the same origin replays recipes with ModelPort spy 0`
+- `extract step runs Extractor and stores the answer`
+- `system prompt is the fixed core preamble with the plan schema`
+- `nested step refs are stripped before the session is saved`
 
 ---
 
@@ -785,13 +947,17 @@ optimization; Wayback test forbids model on extract).
 
 ## 8. Mapping to product phases
 
-| Spec phase | Slices | Feel it when |
+| Spec phase (SPEC §9) | Slices | Feel it when |
 |---|---|---|
-| 1 Host + SDK + LAUNCH + Perch paste + resume | 0–10, **6b**, **9b** | Kill Perch, reopen, continue; Wikipedia-class task; **portal+iframe fake green** |
-| 2 ATTACH | 11 | Edge profile you picked (Workday cookies live here), debugger banner, same SDK |
-| 3 MCP | 12 | Claude Code on the same session file |
-| 4 Weave + recipe replay | 6 (fake) + 13 (live) | Type in the field; second visit skips think |
-| 5 Unattended | 14 | Exit codes |
+| Draft-1 foundation (done) | 0–10, 6b, 12 (library), 13, 14 (core) | `npm start`, Perch Go, weave live |
+| 1 Harden host | 15 | Unauthenticated GET gets nothing; safe token cannot reach power methods |
+| 2 Provisioning | 16 | Fresh machine, no Chrome installed, browser comes up |
+| 3 CLI | 17 | `tyto open`, `tyto snapshot`, `tyto click` from a shell |
+| 4 Power surface | 18 | `tyto cookies`, `tyto logs --follow`, `tyto cdp` anything |
+| 5 Loop | 19 | `tyto run` answers, replays recipes, asks before Delete |
+| 6 MCP server | 12 (server) | Claude Code connects over stdio |
+| 7 Unattended live | 14 (host) | `tyto run --unattended` exit codes |
+| Later | 11, 9b | ATTACH, vault |
 
 Do not implement Phase 2 UI before Slice 6 is green. That is how god
 objects are born.
@@ -824,6 +990,8 @@ End of week 1: `npm test` tells the Tyto story with no browser — including
 - Extension `window.tyto = { click }`
 - Host listen `0.0.0.0`
 - Silent default to a named Chrome/Edge profile
+- Requiring an extension for CLI or agent control
+- Forking Chromium instead of pinning Chrome for Testing
 - One `Browser` interface “for convenience”
 - MCP tools that are raw CDP method names
 - Importing `@tyto/cdp` from Perch or MCP
@@ -832,7 +1000,9 @@ End of week 1: `npm test` tells the Tyto story with no browser — including
 - Cookies or tokens in the session JSON (vault handles only)
 - Any auth material (cookie value, bearer token) in a tape event, model prompt, or log
 - Harvesting OS credential-store, Kerberos TGT, or LSASS (out of scope)
-- Exporting auth material to non-browser callers via the SDK
+- Returning unmasked auth material without `reveal: true`, or to the safe scope at all
+- Persisting a revealed value (session, tape, log)
+- Serving any token to an unauthenticated HTTP request
 - Logging `Set-Cookie` or `Authorization` header values
 - Calling `document.cookie` to read httpOnly cookies (use `Network.getAllCookies`)
 - Replaying an expired bundle without operator re-auth (prompt, do not silently 401)
@@ -846,7 +1016,7 @@ End of week 1: `npm test` tells the Tyto story with no browser — including
 From the spec one-line tests, now as CI:
 
 1. Fake + live: paste-to-trusted-click does not screenshot.
-2. Host restart: same session id continues.
+2. Host restart: same session id continues (`tyto resume`).
 3. Wayback fixture: static extract, `ModelPort` call count 0.
 4. Shell fixture: extract blocked.
 5. Security: unauthorized RPC, bind loopback, page has no command API
@@ -854,14 +1024,20 @@ From the spec one-line tests, now as CI:
 6. Occupancy: operator typing prevents `perform` (fake + live).
 7. Hosted app: portal shell + tenant iframe; act in the granted child;
    recipes keyed by tenant origin.
-8. Identity vault: quit browser, reopen session, agent resumes authenticated
-   on a cookie-session origin without operator re-typing a password.
+8. Staying logged in: quit the browser, `tyto start` again with the same
+   profile, agent resumes authenticated without re-typing a password
+   (profile persistence; the vault is deferred).
 9. Redaction: full model transcript from authenticated run contains zero
    cookie or token values; verified by grep over the session file.
-10. Vault at rest: bundle file is ciphertext; no fixture or test writes
-    plaintext cookies to disk.
+10. Secrets at rest: no fixture, test, session, or tape writes a plaintext
+    cookie or token to disk.
+11. Out of the box: `tyto start` on a machine with no Chrome installed
+    brings up the pinned Chromium, no extension.
+12. Full access: every DevTools domain is reachable via `tyto cdp`; cookies,
+    storage, console, and network are reachable via first-class commands,
+    masked unless `--reveal`.
 
-Until those six are green, we are not “done with Phase 1.”
+Until all twelve are green, we are not done with v1.
 
 ---
 

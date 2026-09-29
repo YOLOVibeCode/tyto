@@ -8,11 +8,15 @@ alwaysApply: false
 
 JSON-RPC 2.0. Methods are the product surface, not CDP method names.
 
-- `PERCH_SAFE_METHODS` is the allowlist for Perch and MCP.
+- `PERCH_SAFE_METHODS` is the allowlist for Perch and MCP (safe token).
 - Do not add `cdp.send`, `debug.cdp`, or credential read/write to that list.
+- `POWER_METHODS` (raw CDP, cookies, storage, network bodies) is for the
+  `tyto` CLI's power token only, disjoint from the safe set, and masked
+  unless `reveal: true`.
 - `identity.status` is allowed. `identity.capture` is host-internal.
 - Errors: JSON-RPC `error.code` + stable `message`. No stack traces to clients.
 - Params/results are JSON-serializable. No `Map`, no `backendNodeId` in
   session payloads.
 
-When adding a method: test that MCP tool list still equals the Perch-safe set.
+When adding a method: test that MCP tool list still equals the Perch-safe set,
+and that a safe token calling a power method is `unauthorized`.

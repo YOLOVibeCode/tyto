@@ -1,13 +1,31 @@
 # Tyto
 
-**An AI-first browser you drive in prose — without screenshots.**
+**An AI-first browser you control from the command line — without screenshots
+and without an extension.**
 
 Barn owls (*Tyto alba*) hunt in the dark by hearing alone. Tyto reads a page as a
 **document** (accessibility tree) and clicks as you would (**trusted CDP input**).
-The durable object is the **prompt session on disk**, not a Chrome sidebar.
+The durable object is the **prompt session on disk**.
 
-You occupy **Google Chrome** or **Microsoft Edge** on macOS, Windows, and Linux.
-The site cannot drive Tyto. The only door is a local SDK (`127.0.0.1` + token).
+Tyto provisions its **own pinned Chromium** (Chrome for Testing) on macOS,
+Windows, and Linux, and exposes everything DevTools can see and do — pages,
+frames, input, console, network, cookies, storage, raw CDP — as `tyto`
+commands. A human, a script, or Claude Code drives it the same way. The site
+cannot drive Tyto. The only door is the local host (`127.0.0.1` + token).
+
+```bash
+tyto start                                   # pinned Chromium, dedicated profile
+tyto open https://en.wikipedia.org
+tyto type "Search Wikipedia" "barn owl" --enter
+tyto extract "conservation status"
+tyto logs --follow                           # console, network, exceptions
+tyto cookies --json                          # values masked unless --reveal
+tyto cdp Runtime.evaluate '{"expression":"document.title"}'
+tyto run "open the barn owl article and tell me its conservation status"
+```
+
+> The `tyto` CLI and bundled Chromium are the **v1 target** (SPEC draft 2) and
+> are being built now. See [Status](#status) for what runs today.
 
 A [YOLOVibeCode](https://github.com/YOLOVibeCode) public repo. Product: Noctusoft, Inc.
 
@@ -43,8 +61,8 @@ last URL, browse, continue.
 
 ## What you use it for
 
-Tyto is for operating the **same Chrome/Edge profile you already use**, in
-prose, without a screenshot loop.
+Tyto is for operating the web from a shell — by command or in prose — without
+a screenshot loop and without handing a browser extension your session.
 
 | You paste… | Tyto does… |
 |---|---|
@@ -53,11 +71,12 @@ prose, without a screenshot loop.
 | Forms | Fill from notes in the prompt; confirm-gate on submit / purchase / delete / send. |
 | Weave | You type name and address; Tyto does the rest of the wizard. You keep the keyboard. |
 | Resume | Quit the browser. Open the **same prompt file**. `goto` last URL, continue. |
-| Claude Code | Same session document over MCP. Losing the MCP socket does not delete the work. |
+| Claude Code | Shells out to `tyto … --json`, or connects over MCP. Same host, same session file. |
+| Debug | `tyto logs --follow`, `tyto network`, `tyto cookies`, `tyto cdp <any method>`. |
 | Recipes | After a good run, replay **role + accessible name + landmark** — not `backendNodeId`. |
 
-Improper: unattended agent on the profile that holds payroll or bank cookies
-with a wide allowlist and no confirm-gates. You pick the profile explicitly.
+Improper: unattended agent logged into payroll or banking with a wide
+allowlist and no confirm-gates. Profiles are explicit and named.
 
 ---
 
@@ -134,36 +153,43 @@ Limits that still apply: default-deny allowlist, confirm-gates, page text is
 
 ```
 prompt session (disk)
-    → SDK / MCP / Perch     127.0.0.1 + token
-        → host (kernel)
-            ├─ LAUNCH  Chrome/Edge + localhost CDP
-            └─ ATTACH  native messaging → extension → chrome.debugger
+    → tyto CLI (power token) · MCP / Perch (safe token)     127.0.0.1
+        → host daemon (kernel)
+            └─ LAUNCH  Tyto Chromium (pinned Chrome for Testing) + loopback CDP
+               (ATTACH to an everyday Chrome/Edge via extension: deferred)
 ```
 
 **Core** (`@tyto/core`) is pure TypeScript: ports, recipes, classify, allowlist,
 redaction, identity classification. Default CI never launches Chrome.
 
-**Identity vault** (browser-scoped): capture *your* cookies/tokens (encrypted,
-DEK in the OS keychain), restore into Chrome/Edge only. The model never sees
-auth material. No Kerberos TGT harvest, no impersonation, no export to scripts.
+**Staying logged in** is the dedicated profile (`~/.tyto/profiles/<name>`):
+log in once in the Tyto window. The encrypted identity vault is deferred.
+Secret values are masked on every surface unless the owner asks `--reveal`,
+and never reach the model.
 
 ---
 
 ## Status
 
-**Slices 0–9 (contract) + host Perch UI** are in-tree and tested — including host
-JSON-RPC on loopback, `GET /` Perch, model HTTP adapters (mocked), and CDP
-trusted-click / OOPIF contract tests on a scripted wire. Live Chrome spawn is
-`TYTO_LIVE=1` (`npm start`). The MV3 extension is specified; identity restore
-is not the first-run path. `poc/` is a Playwright spike used to prove AX + tape;
-it is not the product API.
+**Works today (`npm start`):** loopback JSON-RPC host, Perch page, launch of an
+*installed* Chrome/Edge with a dedicated profile, accessibility snapshot,
+model-planned trusted clicks, operator weave. Nightly live E2E covers the
+loop, weave, and a cookie capture/restore round-trip.
+
+**Not yet:** the `tyto` CLI, bundled Chromium, the power surface (cookies,
+network, raw CDP), assistant replies and session resume in Perch, recipes,
+agent confirm-gates, a runnable MCP server, ATTACH, and a host-wired vault.
+Order of work: [SPEC §9](./docs/SPEC.md#9-build-order) ·
+[IMPLEMENTATION Slices 15–19](./docs/IMPLEMENTATION.md).
+
+`poc/` is a Playwright spike used to prove AX + tape; it is not the product API.
 
 ---
 
 ## Use it
 
-There is **no packaged app** yet. You run the host from this repo. Opening
-Chrome from the Dock does not start Tyto.
+There is **no `tyto` command or packaged app** yet. You run the host from
+this repo. Opening Chrome from the Dock does not start Tyto.
 
 **Full walkthrough:** [docs/USAGE.md](./docs/USAGE.md).
 
@@ -189,7 +215,8 @@ Kill Perch: session JSON under `~/.tyto/sessions/` remains.
 
 ## Develop
 
-Requires **Node 22+**. Tests must pass **offline**.
+Requires **Node 24.15+ or 26** (the jsdom test dependency rejects older 22.x).
+Tests must pass **offline**.
 
 ```bash
 npm test
@@ -221,9 +248,11 @@ npx tsx poc/run.ts --url "https://en.wikipedia.org/wiki/Main_Page" --goal "…"
 | `@tyto/sdk` | Client |
 | `@tyto/cdp` | CDP adapter — **not Playwright** |
 | `@tyto/llm` | OpenAI-compatible + Anthropic HTTP |
-| `@tyto/mcp` | Claude Code adapter (Slice 12) |
-| `@tyto/perch` | Session sidebar (Slice 10) |
-| `extension/` | MV3 ATTACH (Slice 11) |
+| `@tyto/mcp` | MCP helpers; server not yet runnable (Slice 12) |
+| `@tyto/perch` | Local session view (Slice 10) |
+| `@tyto/cli` | `tyto` command — planned (Slice 17) |
+| `@tyto/chromium` | Pinned Chrome for Testing provisioning — planned (Slice 16) |
+| `extension/` | MV3 side panel; ATTACH deferred (Slice 11) |
 
 ---
 
@@ -242,8 +271,10 @@ If you paste a real key: **rotate it**, do not just delete the commit.
 
 ## One-line tests (from the spec)
 
+- If you must install an extension to let AI drive the browser, Tyto is not done.
+- If DevTools can see it and `tyto` cannot, Tyto is not done.
 - If a power user would rather screenshot-agent the tab than paste a goal, Tyto is not done.
 - If they quit the browser and cannot reopen the **same prompt**, Tyto is not done.
 - If a website can drive the SDK, Tyto is not done.
 - If they can use it by hand (iframe, DHTML, proxied host) and Tyto cannot, Tyto is not done.
-- If the model transcript contains a cookie or token, Tyto is not done.
+- If a cookie or token lands in an agent transcript or on disk without `--reveal`, Tyto is not done.

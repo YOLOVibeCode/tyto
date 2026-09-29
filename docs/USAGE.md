@@ -6,7 +6,12 @@ Opening Google Chrome from the Dock does nothing — the **host** has to be runn
 You occupy a Chrome or Edge window that **Tyto launches**. You steer it from
 **Perch** (a local page). The site you browse cannot command Tyto.
 
-Operator contract: [SPEC.md](./SPEC.md). This file is the current start path.
+Operator contract: [SPEC.md](./SPEC.md). This file is the **current** start path.
+
+> **Where this is going.** v1 replaces `npm start` + Perch with a `tyto`
+> command and a Tyto-downloaded Chromium (no installed Chrome, no extension):
+> `tyto start`, `tyto open`, `tyto snapshot`, `tyto logs`, `tyto cookies`,
+> `tyto cdp …`. Not built yet — see SPEC §5.2 and IMPLEMENTATION Slices 15–19.
 
 ---
 
@@ -27,7 +32,7 @@ the first run.
 
 ## Prerequisites
 
-- **Node 22+**
+- **Node 24.15+ or 26** (older 22.x fails the jsdom-based UI tests)
 - **Google Chrome** or **Microsoft Edge** installed in a normal location
   (`/Applications/Google Chrome.app` on macOS, or on `PATH`)
 - A running **OpenAI-compatible model**. Default:
@@ -60,7 +65,9 @@ npm start
 The first start:
 
 1. Writes a host token into **local** `.env` if none exists (gitignored; never
-   printed to the terminal)
+   printed to the terminal). Note: the host does **not** read `.env` back, so
+   unless `TYTO_HOST_TOKEN` is exported in your shell, each start uses a fresh
+   token and the one in `.env` goes stale.
 2. Listens on `127.0.0.1:7420` (override with `TYTO_PORT`)
 3. Launches Chrome with `--remote-debugging-address=127.0.0.1`
 4. Opens Perch in your default browser
@@ -105,8 +112,9 @@ It does **not** grant every origin a page happens to load (iframes, SSO popups).
 | `~/.tyto/profile/` | Chrome/Edge user-data-dir for the launched window (empty on first run). |
 | `~/.tyto/sessions/` | Prompt session JSON (goal, plan, last URL, model id). This is the durable object. |
 
-Resume later: `npm start` again, then continue from the same session files.
-Killing Perch does not delete them.
+Killing Perch does not delete session files. Perch cannot reopen an old
+session yet — every **Go** starts a new one (resume is planned as
+`tyto resume`, Slice 17/19).
 
 ---
 
@@ -190,7 +198,8 @@ not running or the catalog endpoint returned an error.
 ### Send a goal
 
 Type your goal in the composer at the bottom and press **Send** (or Enter).
-Shift+Enter inserts a newline. The transcript shows your message and Tyto's reply.
+Shift+Enter inserts a newline. The transcript shows your message; the agent
+loop does not write an assistant reply yet (Slice 19).
 
 ### Scope: This tab vs All tabs
 
@@ -244,7 +253,7 @@ Tyto uses four test tiers. Only Tier 1 gates merges.
 | 1 | JSDOM UI (perch.html + sidepanel.js) | ✅ Merge-gating | `npm test` |
 | 2 | Live loop — Tyto drives real Chrome | `TYTO_E2E=1 TYTO_LIVE=1` | `npm run test:e2e` |
 | 3 | Playwright extension side-panel DOM | `TYTO_E2E=1` | `npm run test:e2e` |
-| 4 | Ollama nightly — real model round-trip | `TYTO_MODEL_LIVE=1` | `TYTO_MODEL_LIVE=1 npm run test:e2e` |
+| 4 | Ollama (manual) — real model round-trip | `TYTO_MODEL_LIVE=1` | `TYTO_MODEL_LIVE=1 npm run test:e2e` |
 
 ### Tier 1 — JSDOM (offline, gating)
 
@@ -273,7 +282,9 @@ greps the session file, tape, model prompt, and vault ciphertext for the cookie 
 asks the agent to fill the same box. Mid-keystroke the operator's text stays.
 After the operator pauses, the loop resumes from a fresh snapshot.
 
-Unattended exit codes (Slice 14) are `runUnattended` in `@tyto/core`. Preflight:
+Unattended exit codes (Slice 14) are `runUnattended` in `@tyto/core`. The CLI
+entry below parses arguments but is **not usable live yet** — it exits 1
+unless tests inject ports:
 
 ```bash
 npm run run:unattended -- --session <id> [--allow-confirm-fail]
@@ -284,7 +295,7 @@ npm run run:unattended -- --session <id> [--allow-confirm-fail]
 | 0 | done |
 | 2 | document still a shell (`ShellNotReady`) |
 | 3 | allowlist deny |
-| 4 | confirm required (`--no-confirm`, the default) |
+| 4 | confirm required (the default without `--allow-confirm-fail`) |
 
 ### Tier 3 — Extension panel (opt-in, Playwright)
 
@@ -305,17 +316,19 @@ visible, token absent from DOM, origin not auto-granted on panel load.
 
 Requires `TYTO_E2E=1`.
 
-### Tier 4 — Ollama nightly (non-gating)
+### Tier 4 — Ollama (manual, non-gating)
 
 `e2e/test/ollama-live.test.ts` hits a local Ollama instance, lists models, then sends a
 single-step session and asserts the response parses as a valid plan. Catches prompt /
-format drift before it affects users. Never blocks a merge.
+format drift before it affects users. Never blocks a merge. Not scheduled in
+CI; run it by hand.
 
 Requires `TYTO_MODEL_LIVE=1` (plus Ollama running with `TYTO_BASE_URL` + `TYTO_MODEL`).
 
 ### CI
 
-`.github/workflows/ci.yml` — airplane-mode check, runs on every push / PR.
+`.github/workflows/ci.yml` — airplane-mode check plus gitleaks, on push to
+`main` and on every PR.
 `.github/workflows/e2e.yml` — Tiers 2–3, nightly + `workflow_dispatch`, marked
 `continue-on-error: true`. Not required for merge. Tier 3 runs under `xvfb-run`
 because the extension test needs a display.

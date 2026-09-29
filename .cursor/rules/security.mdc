@@ -30,13 +30,19 @@ tape.push("network", redactor.safe(hdr));
 ## Identity
 
 Auth material is **data AND secret**. Encrypted at rest; DEK in OS keychain
-(memory fake in tests). Restore **only** into Chrome/Edge. No OS ticket harvest,
-no impersonation, no SDK export of cookies.
+(memory fake in tests). Restore **only** into the browser. No OS ticket harvest,
+no impersonation.
+
+Cookie/token values leave the host only to the **power** scope (the `tyto`
+CLI) when the request says `reveal: true`. Masked otherwise. Never persisted
+raw, never sent to `ModelPort`, never to the safe scope (Perch, MCP).
 
 Capture/restore requires an explicit origin grant. Expired bundles yield to
 the operator — do not replay a dead session.
 
 ## Control plane
 
-Host and debug port: `127.0.0.1` + token. Extension: native messaging only;
-no `window.tyto`. Confirm submit / purchase / delete / send.
+Host and debug port: `127.0.0.1` + token. Reject non-loopback `Host` and
+foreign `Origin`. Never serve a token to an unauthenticated request.
+Extension (deferred): native messaging only; no `window.tyto`. The agent
+confirms submit / purchase / delete / send.

@@ -2,7 +2,7 @@
 
 **An AI-first browser you drive in prose — without screenshots.**
 
-Noctusoft, Inc. — design doc, draft 2  
+Noctusoft, Inc. — design doc, draft 3 (CLI-first, Tyto-owned Chromium)  
 Full specification: [`SPEC.md`](./SPEC.md) (use cases, requirements, security, platforms).  
 Implementation: [`IMPLEMENTATION.md`](./IMPLEMENTATION.md) (TDD + ISP).
 
@@ -14,6 +14,19 @@ the tab, the sidebar, or a Chrome extension — **you must not lose the work.**
 > sidecar, not “Playwright with a chat box.” Tyto is the thing you open when
 > you want to *use the web with a model sitting next to you*, as fast as
 > clicking it yourself. Treat it that way in naming, repos, and roadmap.
+
+---
+
+## Draft 3 in one paragraph
+
+Tyto ships its **own pinned Chromium** (Chrome for Testing, downloaded on
+first run) with the AI plumbing built in, and the **command line is the
+steering wheel**: `tyto open`, `tyto snapshot`, `tyto click`, `tyto logs`,
+`tyto cookies`, `tyto cdp <anything>`. No extension to install, no existing
+browser required. A human, a script, or Claude Code drives it the same way.
+Everything below still holds — document not screenshot, trusted input,
+prompt session on disk, weave — but occupying your everyday Chrome/Edge
+(ATTACH) and the identity vault are **deferred**. See [`SPEC.md`](./SPEC.md).
 
 ---
 
@@ -177,18 +190,18 @@ This is a product requirement, not a polish item.
 | Switch tabs, go back | Agent re-browses; never trusts last `ref_N` |
 | Fill half a form yourself | Agent reads the new AX tree and continues the *rest* |
 
-The Chrome-extension debug banner (`chrome.debugger`) is the tax for
-**occupying a browser you already live in** (your Edge/Chrome profiles).
-Tyto pays that tax only in **attach** mode, and only because you asked for
-100% CDP in *that* process. **Launch** mode starts Chrome or Edge itself with
-a localhost debug port — full CDP, your chosen profile copy or path, no
-store sandbox.
+Tyto launches **its own Chromium** with a loopback debug port — full CDP,
+a dedicated persistent profile, no extension, no store sandbox, no debugger
+banner. (Draft 2’s ATTACH mode — an extension inside your everyday
+Chrome/Edge — is deferred.)
 
 Either way, **the open web cannot drive it.** Control is a local SDK, not a
 page script, not a public API.
 
-`perch` is the Claude Code analog: a thin sidebar. Chat lives there. The
-prompt session on disk is the source of truth. The page stays the page.
+The **CLI** is the Claude Code analog: you (or Claude Code itself) type
+commands and goals in a terminal. `perch` is an optional local view of the
+same sessions. The prompt session on disk is the source of truth. The page
+stays the page.
 
 ---
 
@@ -206,20 +219,19 @@ Not a random extension. Not a WAN-facing port.
   prompt session (disk)
            │
            ▼
-  Tyto SDK  (Node / Python / MCP)     ← only callers
-           │  127.0.0.1 + token
+  tyto CLI (power token)   MCP / Perch (safe token)   ← only callers
+           │  127.0.0.1 + token, Host/Origin checked
            ▼
-  Tyto host (native, win / mac / linux)
+  Tyto host daemon (win / mac / linux)
            │
-           ├─ LAUNCH   spawn Chrome or Edge
-           │           user-data-dir = chosen profile
-           │           --remote-debugging-port=127.0.0.1:… 
+           ├─ LAUNCH   spawn Tyto Chromium (pinned Chrome for Testing)
+           │           or --browser chrome|edge|<path>
+           │           user-data-dir = ~/.tyto/profiles/<name>
+           │           --remote-debugging-address=127.0.0.1
            │           full CDP, no MV3 sandbox
            │
-           └─ ATTACH   native-messaging ↔ Tyto extension
-                       already running in Chrome or Edge
-                       extension auto-enables debugger on the tab
-                       full CDP in *your* everyday profiles
+           └─ ATTACH   (deferred) native messaging ↔ Tyto extension
+                       inside an everyday Chrome/Edge
 ```
 
 **SDK** is the product’s exterior: Claude Code, scripts, Perch backend, later
@@ -241,9 +253,9 @@ your profiles). Firefox is not a day-one CDP peer; do not pretend.
 
 | Caller | Allowed |
 |---|---|
-| Tyto SDK on localhost with session token | Yes — full CDP |
-| Tyto extension via native host | Yes — only as the host’s hands |
-| Perch UI (same origin as host) | Yes — paste / interrupt, not raw CDP from the page |
+| `tyto` CLI on localhost with the power token | Yes — full CDP, cookies, storage, network (secrets masked unless `--reveal`) |
+| MCP / Perch with the safe token | Yes — sessions, snapshot, act, tape; no raw CDP, no secret values |
+| Tyto extension via native host (deferred) | Only as the host’s hands |
 | JavaScript on example.com | **No** |
 | Another extension | **No** |
 | Bind debug port on `0.0.0.0` | **No** — `127.0.0.1` only |
@@ -307,16 +319,21 @@ how we know we failed, without photographing the screen.
 
 ## Components
 
-**`tyto` host** — native, cross-platform. Launch or attach, token, allowlist,
+**`tyto` CLI** — the primary client. Every browser capability as a command,
+`--json` for agents. Power scope.
+
+**Tyto Chromium** — pinned Chrome for Testing, downloaded to
+`~/.tyto/browsers/` and verified. Not a fork.
+
+**`tyto` host** — local daemon, cross-platform. Launch, tokens, allowlist,
 prompt sessions on disk. The kernel.
 
 **`tyto` SDK** — the only supported way to drive the host from the outside
 (TypeScript first, MCP as a thin adapter, Python when needed). Full
 automation surface: tabs, frames, AX snapshot, trusted input, tape, ready.
 
-**`tyto` extension** — Chrome + Edge. Auto debug-attach for 100% CDP in
-ATTACH mode. Native messaging only. Not a Store-shaped product that lives
-without the host.
+**`tyto` extension** (deferred) — Chrome + Edge. Auto debug-attach for ATTACH
+mode. Native messaging only. Never required for CLI control.
 
 **`perch`** — one *view* of the prompt session. If Perch crashes, the
 session file is still on disk. Not the source of truth.
@@ -347,18 +364,17 @@ CDP actions look like a real user. Nothing downstream will save you.
 
 ## Build order (for this product)
 
-**Phase 1 — feel it.** Host + SDK + prompt session on disk. LAUNCH Chrome or
-Edge (mac first, same code for win/linux). AX loop, interrupt, Perch paste.
-Kill Perch mid-run and resume from the file.
+Draft-1 foundation is in-tree (host, AX loop, trusted input, weave, Perch).
+Next, in order (SPEC §9):
 
-**Phase 2 — ATTACH.** Extension on Chrome and Edge, auto debugger, native
-messaging. Same SDK. Your existing profiles, explicitly picked.
-
-**Phase 3 — Claude Code / MCP** as another SDK client. Same session file.
-
-**Phase 4 — weave + recipe replay.** Yield on real user input.
-
-**Phase 5 — unattended runner.** Exit codes. Not day-one occupancy.
+1. **Harden the host** — token scopes, Host/Origin checks.
+2. **Provision Chromium** — pinned Chrome for Testing, out of the box.
+3. **`tyto` CLI + daemon** — primitives from a shell.
+4. **Power surface** — raw CDP, cookies, storage, network, event streams.
+5. **Loop completeness** — replies, re-observe, confirm-gate, recipes, resume.
+6. **MCP server** on the safe surface.
+7. **Unattended runner** live.
+8. Later: ATTACH, identity vault.
 
 Scholarmancy may later implement `waitReady` / `snapshot` on `IPageDriver`.
 That is a port, not a merge.
@@ -406,7 +422,8 @@ Ruled out: Lumen (vision-first agent already).
 
 ## One-line test
 
-If a native power user would rather screenshot-agent the tab than paste into
-Perch, the product is not done. If they paste, glance, and type into the same
+If you need an extension to let AI drive the browser, the product is not
+done. If a native power user would rather screenshot-agent the tab than type
+`tyto run`, the product is not done. If they paste, glance, and type into the same
 field without waiting on a photograph — that is Tyto. If they quit Chrome
 and cannot open the same prompt and continue — that is not Tyto.

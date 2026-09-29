@@ -49,9 +49,11 @@ To drive a real browser from this clone, follow [docs/USAGE.md](./docs/USAGE.md)
 | `packages/host` | Composition root, `127.0.0.1` + token |
 | `packages/sdk` | Client |
 | `packages/llm` | OpenAI-compatible + Anthropic HTTP |
-| `packages/mcp` | Claude Code adapter |
-| `packages/perch` | Sidebar view of the session file |
-| `packages/poc` | Spike only; harvest algorithms, do not promote |
+| `packages/mcp` | MCP adapter (safe scope) |
+| `packages/perch` | Local view of the session file (safe scope) |
+| `packages/cli` | `tyto` command, power scope (planned, Slice 17) |
+| `packages/chromium` | Pinned Chrome for Testing provisioning (planned, Slice 16) |
+| `poc/` | Playwright spike only; harvest algorithms, do not promote (`packages/poc` is a pointer README) |
 
 ## PRs
 
