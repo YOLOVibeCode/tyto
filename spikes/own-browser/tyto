@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+"""tyto (POC) — your own AI browser from the command line. A thin layer over agent-browser.
+
+  tyto start [--headed]        launch Tyto's own Chrome with a persistent profile (logins survive restarts)
+  tyto open <url>              navigate, then print the BRIEF (structure, network, JS errors, state)
+  tyto brief                   the BRIEF for the current page
+  tyto click|fill|type|press|select|check|uncheck|hover|scroll <args>
+                               act, then print what happened (navigation, new requests, new errors)
+  tyto cookies [--reveal]      cookie jar; values masked unless --reveal
+  tyto find <words>            search the whole page text; matching lines with context
+  tyto body <url-substring>    response body of the latest matching request (for debugging)
+  tyto stop                    close the browser (profile is kept)
+  tyto <anything else>         passed straight to agent-browser (snapshot, get, eval, console, network, ...)
+
+Options: --json (machine output for brief/open)   Env: TYTO_HOME (default ~/.tyto-poc), TYTO_PROFILE (default "default")
+"""
+import base64, json, os, re, subprocess, sys, time
+
+HOME = os.environ.get("TYTO_HOME", os.path.expanduser("~/.tyto-poc"))
+PROFILE = os.environ.get("TYTO_PROFILE", "default")
+PROFILE_DIR = os.path.join(HOME, "profiles", PROFILE)
+STATE = os.path.join(HOME, "state.json")
+AB = os.environ.get("TYTO_AB", "agent-browser")
+ACTIONS = {"click", "dblclick", "fill", "type", "press", "select", "check", "uncheck", "hover", "scroll", "find"}
+SECRETISH = re.compile(r'("?(?:token|secret|password|passwd|authorization|api[_-]?key|session|sid)"?\s*[:=]\s*"?)([^",}\s]{4,})', re.I)
+
+def state():
+    try: return json.load(open(STATE))
+    except (FileNotFoundError, json.JSONDecodeError): return {}
+
+def ab_argv(args):
+    base = [AB, "--session", f"tyto-{PROFILE}", "--profile", PROFILE_DIR]
+    if state().get("headed"): base.append("--headed")
+    return base + list(args)
+
+def ab(*args, stdin=None):
+    p = subprocess.run(ab_argv(args), input=stdin, capture_output=True, text=True)
+    return p.returncode, p.stdout, p.stderr
+
+def batch(cmds):
+    rc, out, err = ab("batch", "--json", stdin=json.dumps(cmds))
+    try: steps = json.loads(out)
+    except json.JSONDecodeError: sys.exit(f"tyto: browser not reachable ({err.strip()[:200]})")
+    return [(s.get("result") or {}) if s.get("success") else {"_error": s.get("error")} for s in steps]
+
+def mask(text): return SECRETISH.sub(lambda m: m[1] + "‹masked›", text)
+def short(url, origin): return url[len(origin):] or "/" if origin and url.startswith(origin) else url
+
+PAGE_JS = r"""JSON.stringify((() => {
+  const fw = [];
+  if (window.__NEXT_DATA__ || window.next) fw.push("Next.js");
+  if (window.__NUXT__) fw.push("Nuxt");
+  if (window.React || document.querySelector("[data-reactroot]") ||
+      [...document.querySelectorAll("body > div")].some(d => Object.keys(d).some(k => k.startsWith("__react")))) fw.push("React");
+  if (window.Vue || document.querySelector("[data-v-app]")) fw.push("Vue");
+  if (document.querySelector("[ng-version]")) fw.push("Angular " + document.querySelector("[ng-version]").getAttribute("ng-version"));
+  if (window.jQuery) fw.push("jQuery " + (window.jQuery.fn && window.jQuery.fn.jquery || ""));
+  const nav = performance.getEntriesByType("navigation")[0] || {};
+  const main = document.querySelector("main, [role=main], article") || document.body;
+  return {
+    framework: fw, status: nav.responseStatus || null,
+    dcl_ms: Math.round(nav.domContentLoadedEventEnd || 0), load_ms: Math.round(nav.loadEventEnd || 0),
+    headings: [...document.querySelectorAll("h1,h2,h3")].slice(0, 8).map(h => h.tagName.toLowerCase() + " " + h.innerText.trim().slice(0, 80)),
+    forms: document.forms.length, iframes: document.querySelectorAll("iframe").length,
+    text: (main.innerText || "").replace(/\s+/g, " ").trim().slice(0, 300),
+  };
+})())"""
+
+def collect():
+    t0 = time.time()
+    r = batch([["get", "url"], ["get", "title"], ["snapshot", "-i"], ["console"], ["errors"], ["network", "requests"],
+               ["cookies"], ["storage", "local"], ["storage", "session"],
+               ["eval", "-b", base64.b64encode(PAGE_JS.encode()).decode()]])
+    url, title = r[0].get("url", ""), r[1].get("title", "")
+    page = r[9].get("result")
+    try: page = json.loads(page) if isinstance(page, str) else (page or {})
+    except json.JSONDecodeError: page = {}
+    m = re.match(r"^[a-z]+://[^/]+", url); origin = m[0] if m else ""
+    mark = state().get("mark", {})
+    reqs = r[5].get("requests", [])[mark.get("reqs", 0):]
+    return {"url": url, "title": title, "origin": origin, "page": page,
+            "snapshot": r[2].get("snapshot", ""), "console": r[3].get("messages", [])[mark.get("cons", 0):],
+            "errors": r[4].get("errors", [])[mark.get("errs", 0):],
+            "requests": reqs, "cookies": r[6].get("cookies", []),
+            "local": r[7].get("data", {}) or {}, "session": r[8].get("data", {}) or {}, "collect_s": round(time.time() - t0, 2)}
+
+def failed_body(req):
+    rc, out, _ = ab("network", "request", req["requestId"], "--json")
+    try: d = json.loads(out)["data"]
+    except (json.JSONDecodeError, KeyError): return ""
+    body = d.get("responseBody") or d.get("body") or (d.get("response") or {}).get("body") or ""
+    return mask(str(body).replace("\n", " "))[:160]
+
+def brief(c, as_json=False):
+    o = c["origin"]; p = c["page"]
+    noise = lambda q: q["url"].endswith("/favicon.ico")
+    reqs = [q for q in c["requests"] if not noise(q)]
+    api = [q for q in reqs if q.get("resourceType") in ("Fetch", "XHR")]
+    failed = [q for q in reqs if (q.get("status") or 0) >= 400]
+    issues = []
+    for q in failed[:5]:
+        line = f"network {q.get('status')} {q.get('method')} {short(q['url'], o)} ({q.get('resourceType')})"
+        if q.get("resourceType") in ("Fetch", "XHR"):
+            b = failed_body(q)
+            if b: line += f" → {b}"
+        issues.append(line)
+    for e in c["errors"][:5]: issues.append("uncaught " + str(e.get("message") or e.get("text") or e)[:200])
+    for m in c["console"]:
+        if m.get("type") in ("error", "warning", "assert"): issues.append(f"console.{m.get('type')} {m.get('text', '')[:200]!r}")
+    cookies = [{"name": k["name"], "domain": k.get("domain"), "httpOnly": k.get("httpOnly"), "secure": k.get("secure"),
+                "lifetime": "session" if k.get("session") or (k.get("expires", -1) in (-1, 0)) else f"{max(0, round((k['expires'] - time.time()) / 86400))}d"}
+               for k in c["cookies"]]
+    snap = c["snapshot"].splitlines()
+    if as_json:
+        return json.dumps({"url": c["url"], "title": c["title"], "status": p.get("status"), "framework": p.get("framework"),
+                           "timing_ms": {"dcl": p.get("dcl_ms"), "load": p.get("load_ms")}, "issues": issues,
+                           "network": {"total": len(reqs), "api": [f"{q.get('method')} {short(q['url'], o)} {q.get('status')}" for q in api[:15]]},
+                           "cookies": cookies, "localStorage": {k: len(str(v)) for k, v in c["local"].items()},
+                           "sessionStorage": {k: len(str(v)) for k, v in c["session"].items()},
+                           "headings": p.get("headings"), "interactive": snap[:40], "text": p.get("text")}, indent=1)
+    kinds = {}
+    for q in reqs: kinds[q.get("resourceType", "?")] = kinds.get(q.get("resourceType", "?"), 0) + 1
+    out = [f"PAGE     {c['title']} — {c['url']}  [{p.get('status') or '?'}, DOMContentLoaded {p.get('dcl_ms')}ms, load {p.get('load_ms')}ms]",
+           f"APP      {', '.join(p.get('framework') or []) or 'no framework detected'} · {p.get('forms', 0)} form(s) · {p.get('iframes', 0)} iframe(s)"]
+    out.append(f"ISSUES   {len(issues)}" + ("" if issues else " — none"))
+    out += [f"  ✗ {i}" for i in issues]
+    out.append(f"NETWORK  {len(reqs)} requests (" + ", ".join(f"{v} {k.lower()}" for k, v in sorted(kinds.items())) + f"), {len(failed)} failed")
+    out += [f"  api {q.get('method')} {short(q['url'], o)} → {q.get('status')}" for q in api[:10]]
+    ck = ", ".join(f"{k['name']}({'httpOnly ' if k['httpOnly'] else ''}{k['lifetime']})" for k in cookies) or "none"
+    out.append(f"STATE    cookies: {ck} · localStorage: {len(c['local'])} keys · sessionStorage: {len(c['session'])} keys  (values masked)")
+    if p.get("headings"): out.append("OUTLINE  " + " | ".join(p["headings"]))
+    out.append(f"ELEMENTS ({len(snap)} interactive; use the @eN refs with tyto click/fill)")
+    out += ["  " + s for s in snap[:40]]
+    if len(snap) > 40: out.append(f"  … {len(snap) - 40} more (tyto snapshot -i)")
+    if p.get("text"): out.append(f"TEXT     {p['text']}")
+    text = "\n".join(out)
+    return text + f"\n({round(len(text) / 4)} tokens, gathered in {c['collect_s']}s)"
+
+def act(args):
+    before = collect_counts()
+    rc, out, err = ab(*args)
+    sys.stdout.write(out); sys.stderr.write(err)
+    time.sleep(0.25)  # POC settle; product: wait on network/DOM quiescence events
+    r = batch([["get", "url"], ["console"], ["errors"], ["network", "requests"]])
+    url = r[0].get("url", "")
+    reqs, cons, errs = r[3].get("requests", []), r[1].get("messages", []), r[2].get("errors", [])
+    m = re.match(r"^[a-z]+://[^/]+", url); o = m[0] if m else ""
+    lines = []
+    if url != before["url"]: lines.append(f"  → now at {url}")
+    for q in reqs[before["reqs"]:]:
+        if not q["url"].endswith("/favicon.ico"): lines.append(f"  net {q.get('method')} {short(q['url'], o)} → {q.get('status')}")
+    for e in errs[before["errs"]:]: lines.append("  ✗ uncaught " + str(e.get("message") or e.get("text") or e)[:200])
+    for m_ in cons[before["cons"]:]:
+        lines.append(f"  console.{m_.get('type')} {m_.get('text', '')[:200]!r}")
+    print("AFTER\n" + ("\n".join(lines) if lines else "  no navigation, requests, or console output"))
+    return rc
+
+LOCATORS = {"role", "text", "label", "placeholder", "alt", "title", "testid", "first", "last", "nth"}
+FIND_JS = r"""JSON.stringify((() => {
+  const terms = %s.toLowerCase().split(/\s+/).filter(Boolean);
+  const lines = (document.body.innerText || "").split(/\n+/).map(l => l.trim()).filter(Boolean);
+  const hits = [];
+  lines.forEach((l, i) => { const low = l.toLowerCase(); if (terms.every(t => low.includes(t)))
+    hits.push(lines.slice(Math.max(0, i - 1), i + 3).join(" ⏎ ").slice(0, 300)); });
+  return {count: hits.length, hits: hits.slice(0, 8)};
+})())"""
+
+def find_text(q):
+    """Search the whole page text (every line), return matches with a little context."""
+    js = FIND_JS % json.dumps(q)
+    r = batch([["eval", "-b", base64.b64encode(js.encode()).decode()]])[0].get("result")
+    try: d = json.loads(r) if isinstance(r, str) else (r or {})
+    except json.JSONDecodeError: d = {}
+    if not d.get("count"): print(f"no line contains all of: {q}"); return 1
+    print(f"{d['count']} match(es) for {q!r} (line ⏎ next lines):")
+    for h in d["hits"]: print("  • " + h)
+    return 0
+
+def collect_counts():
+    r = batch([["get", "url"], ["console"], ["errors"], ["network", "requests"]])
+    return {"url": r[0].get("url", ""), "cons": len(r[1].get("messages", [])), "errs": len(r[2].get("errors", [])),
+            "reqs": len(r[3].get("requests", []))}
+
+def main(argv):
+    as_json = "--json" in argv; argv = [a for a in argv if a != "--json"]
+    if not argv or argv[0] in ("-h", "--help", "help"): print(__doc__); return 0
+    cmd, rest = argv[0], argv[1:]
+    if cmd == "start":
+        os.makedirs(PROFILE_DIR, exist_ok=True)
+        st = state(); st["headed"] = "--headed" in rest
+        os.makedirs(HOME, exist_ok=True); json.dump(st, open(STATE, "w"))
+        t = time.time(); rc, out, err = ab("open", "about:blank")
+        print(f"Tyto browser ready in {time.time() - t:.2f}s · profile {PROFILE_DIR}" if rc == 0 else f"start failed: {err.strip()[:300]}")
+        return rc
+    if cmd == "stop": return ab("close")[0]
+    if cmd == "open":
+        if not rest: print("usage: tyto open <url>"); return 64
+        # Scope the brief to this page. agent-browser's `errors --clear` does not clear (0.38.1), so record offsets instead.
+        st = state(); st["mark"] = collect_counts(); json.dump(st, open(STATE, "w"))
+        rc, out, err = ab("open", rest[0])
+        if rc != 0: print(f"open failed: {(err or out).strip()[:300]}"); return rc
+        ab("wait", "--load", "networkidle")
+        print(brief(collect(), as_json)); return 0
+    if cmd == "brief": print(brief(collect(), as_json)); return 0
+    if cmd == "cookies":
+        c = batch([["cookies"]])[0].get("cookies", [])
+        for k in c:
+            v = k.get("value", "") if "--reveal" in rest else "‹masked›"
+            print(f"{k['name']}={v}  domain={k.get('domain')} httpOnly={k.get('httpOnly')} secure={k.get('secure')} "
+                  f"{'session' if k.get('session') or k.get('expires', -1) in (-1, 0) else 'expires ' + time.strftime('%Y-%m-%d', time.localtime(k['expires']))}")
+        if not c: print("no cookies")
+        return 0
+    if cmd == "body":
+        reqs = batch([["network", "requests"]])[0].get("requests", [])
+        hit = [q for q in reqs if rest and rest[0] in q["url"]]
+        if not hit: print("no matching request"); return 1
+        print(failed_body(hit[-1]) or "(no body)"); return 0
+    argv = [("@" + x) if re.fullmatch(r"e\d+", x) else x for x in argv]  # accept refs written without "@"
+    cmd, rest = argv[0], argv[1:]
+    if cmd == "find" and rest and rest[0] not in LOCATORS: return find_text(" ".join(rest))
+    if cmd in ACTIONS: return act(argv)
+    rc, out, err = ab(*argv); sys.stdout.write(out); sys.stderr.write(err); return rc
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

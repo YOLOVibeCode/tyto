@@ -29,7 +29,7 @@
     "poc": "npx tsx poc/run.ts"
   },
   "engines": {
-    "node": ">=22"
+    "node": "^22.22.2 || ^24.15.0 || >=26"
   },
   "devDependencies": {
     "@types/node": "^26.3.0",

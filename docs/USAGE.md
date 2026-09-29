@@ -27,7 +27,7 @@ the first run.
 
 ## Prerequisites
 
-- **Node 22+**
+- **Node 22.22+, 24.15+, or 26** (older 22.x fails the jsdom-based UI tests)
 - **Google Chrome** or **Microsoft Edge** installed in a normal location
   (`/Applications/Google Chrome.app` on macOS, or on `PATH`)
 - A running **OpenAI-compatible model**. Default:

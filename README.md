@@ -1,5 +1,10 @@
 # Tyto
 
+> **Status: paused (2026-09-29).** For AI-driven browsing we use
+> [agent-browser](https://github.com/vercel-labs/agent-browser). Why, with measurements:
+> [docs/DECISION-2026-09-29-agent-browser.md](./docs/DECISION-2026-09-29-agent-browser.md).
+> The code below is kept for reference.
+
 **An AI-first browser you drive in prose — without screenshots.**
 
 Barn owls (*Tyto alba*) hunt in the dark by hearing alone. Tyto reads a page as a
@@ -189,7 +194,8 @@ Kill Perch: session JSON under `~/.tyto/sessions/` remains.
 
 ## Develop
 
-Requires **Node 22+**. Tests must pass **offline**.
+Requires **Node 22.22+, 24.15+, or 26** (`.nvmrc` pins 26; `engine-strict` is on).
+Tests must pass **offline**.
 
 ```bash
 npm test
