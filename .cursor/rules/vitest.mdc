@@ -1,31 +1,13 @@
 ---
-description: Vitest TDD standards — spec-sentence tests, fakes, no Chrome
+description: Vitest standards — spec-sentence tests, fakes, offline
 globs: "**/*.{test,spec}.ts"
 alwaysApply: false
 ---
 
-# Tests (Vitest)
+# Vitest
 
-Default CI is **pure Node**. If a test needs Playwright, Chrome, or `fetch`,
-it does not live in `@tyto/core`.
-
-- `describe` / `it` names are **spec sentences** from `docs/IMPLEMENTATION.md`.
-- Arrange–act–assert. One behavior per `it`. No `it.skip` without a linked issue.
-- Depend on **ports**. Inject fakes (`FakeActuation`, `MemorySessionStore`).
-  Do not mock private internals. Do not share a `FakeTyto` god double.
-- Assert the **spy you care about** (e.g. `ModelPort.complete` call count is 0
-  on shell extract).
-- No sleep-as-success. Use fake `Clock` and tape predicates.
-- Fixtures over live sites. Never write plaintext cookies to disk; vault tests
-  assert ciphertext does not contain the cookie value.
-
-```ts
-// ❌ BAD
-it("works", async () => { await page.click("text=Search") })
-
-// ✅ GOOD
-it("extract on shell throws ShellNotReady and does not call ModelPort", () => {
-  expect(() => extractOrThrow("shell", snap, "status")).toThrow(ShellNotReady);
-  expect(model.calls).toBe(0);
-});
-```
+- Tests live next to the behavior (`packages/*/test/`); names are spec sentences.
+- Default suite: no browser, no agent-browser binary, no network, no keys. Live tests only in `test/live/`.
+- Inject port fakes. Do not mock private methods. No god fake.
+- One behavior per `it`. No `it.skip` without an issue id.
+- No `sleep` as the success condition; use `FakeClock`.

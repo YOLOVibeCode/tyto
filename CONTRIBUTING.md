@@ -1,11 +1,8 @@
 # Contributing
 
-Tyto is built **TDD + ISP**. Read [docs/IMPLEMENTATION.md](./docs/IMPLEMENTATION.md)
-before writing code.
+Tyto is built **TDD + ISP**. Read [docs/IMPLEMENTATION.md](./docs/IMPLEMENTATION.md) before writing code.
 
 ## Agent rules (mandatory)
-
-Coding agents **must** follow TDD, ISP, and stack standards:
 
 | For | Where |
 |---|---|
@@ -22,39 +19,30 @@ git clone git@github.com:YOLOVibeCode/tyto.git
 cd tyto
 git config core.hooksPath .githooks
 npm install
-npm test
+npm run check
 ```
 
-Node 22+. Tests must pass **offline** (`npm test` never launches Chrome).
-To drive a real browser from this clone, follow [docs/USAGE.md](./docs/USAGE.md)
-(`npm start`). There is no packaged app yet.
+Node 22.22+, 24.15+, or 26 (`.nvmrc` pins 26). `npm test` is offline. Live tests (`npm run test:live`) need
+[agent-browser](https://github.com/vercel-labs/agent-browser) installed.
 
 ## Laws
 
-1. A failing test exists before production code for that behavior.
-2. `@tyto/core` depends on **port types only**. No Playwright, no CDP socket,
-   no vendor LLM SDK, no `LiteLLM` type.
-3. Perch and MCP must not see `RawCdpPort` or `CredentialStorePort`.
-4. No cookies, tokens, or API keys in git. Use `.env` (gitignored).
+1. A failing spec-sentence test exists before production code for that behavior.
+2. `@tyto/core` is pure: ports and domain only; no processes, files, network, WebSocket, browser drivers,
+   vendor LLM SDKs.
+3. Never re-implement agent-browser; call its CLI with an argv array.
+4. No cookies, tokens, API keys, traces, or browser state in git.
 
 ## Layout
 
 | Path | Role |
 |---|---|
-| `packages/core` | Domain + ports + fakes |
-| `packages/protocol` | JSON-RPC types |
-| `packages/fs` | Session files on disk |
-| `packages/secrets` | Vault encryption + DEK (memory fake in tests) |
-| `packages/cdp` | Chrome/Edge CDP adapter (not Playwright) |
-| `packages/host` | Composition root, `127.0.0.1` + token |
-| `packages/sdk` | Client |
-| `packages/llm` | OpenAI-compatible + Anthropic HTTP |
-| `packages/mcp` | Claude Code adapter |
-| `packages/perch` | Sidebar view of the session file |
-| `packages/poc` | Spike only; harvest algorithms, do not promote |
+| `packages/core` | Recipes, lint, verify, brief, find, redaction, ports, fakes |
+| `packages/llm` | OpenAI-compatible + Anthropic HTTP model adapters |
+| `packages/agent-browser`, `store`, `compiler`, `cli` | Adapters and the `tyto` command (slices 3–9) |
+| `spikes/own-browser` | Python proof of concept and measurements; not product code |
 
 ## PRs
 
-- `npm run check` is green
-- Do not add Playwright locators as the product path
-- Do not log `Set-Cookie` or `Authorization` values
+- One slice per PR; `npm run check` green; CI green.
+- Never log `Set-Cookie`, `Authorization`, cookie, or token values.

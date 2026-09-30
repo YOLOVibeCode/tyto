@@ -43,3 +43,10 @@ for reference; nothing in it is deleted.
 ## Known issue found
 
 agent-browser 0.38.1: `errors --clear` does not clear the error buffer (worked around in the POC).
+
+## Addendum (2026-09-30): Tyto resumes as a thin layer
+
+Tyto is no longer paused. It is being rebuilt on top of agent-browser to add only what agent-browser lacks:
+recipes (learn once, replay with no model, repair on change) and the one-call brief with whole-page find.
+The old CDP stack, host, Perch, extension, vault, and live tests were removed; they remain at tag
+`archive/tyto-v0`. Plan: [IMPLEMENTATION.md](./IMPLEMENTATION.md).

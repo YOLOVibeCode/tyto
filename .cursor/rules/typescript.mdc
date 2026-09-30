@@ -14,23 +14,23 @@ alwaysApply: false
   explicit guard.
 - Prefer discriminated unions over `enum`. Exhaustive `switch` with `never`.
 - Optional properties: omit the key, or type `T | undefined` deliberately.
-  Do not pass `{ landmark: undefined }` into a `landmark?: string` field.
+  Do not pass `{ default: undefined }` into a `default?: string` field.
 - Public functions: explicit return types on ports and exported domain APIs.
-- Errors: typed domain errors (`ShellNotReady`) for product paths; wrap unknown
+- Errors: typed domain errors (`RecipeLintError`) for product paths; wrap unknown
   causes. Empty `catch {}` is forbidden.
 - Imports: `.ts` extensions as the repo already does. No Playwright, `openai`,
   or `@anthropic-ai/sdk` inside `packages/core`.
 
 ```ts
 // ❌ BAD
-function bind(step: any, snap: any) { return snap.refs.get(step.ref)! }
+function verify(r: any, v: any) { return r[v.required[0]]! }
 
 // ✅ GOOD
-export function bind(step: Step, snap: AxSnapshot): BindResult {
-  if (step.op === "press" || step.op === "extract" || step.op === "done") return "ok";
+export function verify(result: unknown, rule: VerifyRule): VerifyOutcome {
+  if (!isRecord(result)) return { hit: false, miss: "final eval did not return an object" };
   // ...
 }
 ```
 
 Formatting: 2-space indent, LF, `const`/`let` never `var`. One port per file.
-Composition root is `packages/host` only — adapters do not import each other.
+Composition root is `packages/cli` only — adapters do not import each other.
