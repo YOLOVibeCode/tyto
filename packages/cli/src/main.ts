@@ -1,4 +1,5 @@
-import { EXIT, executeRecipe, type ExecDeps, type RecipeStore } from "@tyto/core";
+import { EXIT, executeRecipe, type Compiler, type ExecDeps, type RecipeStore, type TraceStore } from "@tyto/core";
+import { approve, compile, compileTool, type CompileToolDeps } from "./compile/commands.ts";
 import { ACTIONS, act, brief, find, open, type BrowseDeps } from "./browse.ts";
 import { learnCommand, type LearnDeps } from "./learn/commands.ts";
 
@@ -7,6 +8,10 @@ export type CliDeps = {
   exec: ExecDeps;
   browse: BrowseDeps;
   learn: LearnDeps;
+  traces: TraceStore;
+  compiler: Compiler;
+  compileTool: CompileToolDeps;
+  confirm: (question: string) => Promise<boolean>;
   out: (line: string) => void;
   err: (line: string) => void;
 };
@@ -21,10 +26,12 @@ export const USAGE = `usage: tyto <command>
   tyto learn <name> [--session s]         record a task done in that agent-browser session
   tyto learn status <name>                typed inputs recorded so far (names only)
   tyto learn stop <name> --task "…" [--param input_N=name ...]   save the trace
+  tyto compile <name>                     turn a recorded trace into a draft recipe (one model session)
   tyto run <recipe> [--param value ...]   replay a recipe with no model (exit 0 hit, 3 miss)
   tyto test <recipe>                      run the recipe's regression cases
   tyto recipes [--json]                   list recipes
   tyto recipes show <recipe>              print a recipe
+  tyto recipes approve <recipe> [--yes]   allow a recipe to run (required for recipes that use your logins)
   tyto recipes rm <recipe>                delete a recipe`;
 
 class UsageError extends Error {}
@@ -102,6 +109,7 @@ async function test(args: readonly string[], deps: CliDeps): Promise<number> {
 
 async function recipes(args: readonly string[], deps: CliDeps): Promise<number> {
   const [sub, name] = args;
+  if (sub === "approve") return approve(args.slice(1), deps.store, deps.confirm, deps);
   if (sub === "show" || sub === "rm") {
     if (!name) throw new UsageError(`tyto recipes ${sub} needs a recipe name`);
     if (sub === "show") {
@@ -145,6 +153,10 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
         return await test(args, deps);
       case "recipes":
         return await recipes(args, deps);
+      case "compile":
+        return await compile(args, deps, deps);
+      case "compile-tool":
+        return await compileTool(args, deps.compileTool, deps.exec, deps);
       case "learn":
         return await learnCommand(args, deps.learn, deps.browse.runner, deps);
       case "open":

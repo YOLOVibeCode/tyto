@@ -7,6 +7,7 @@ import type { LogMarks } from "../ports/log-marks.ts";
 import type { BrowserEventSource } from "../ports/browser-events.ts";
 import type { TraceStore } from "../ports/trace-store.ts";
 import type { StreamEvent, Trace } from "../trace/types.ts";
+import type { CompileRequest, Compiler } from "../ports/compiler.ts";
 import type { Clock } from "../ports/clock.ts";
 import type { ModelPort } from "../ports/model.ts";
 import type { CompleteRequest, CompleteResponse } from "../types.ts";
@@ -195,5 +196,19 @@ export class MemoryTraceStore implements TraceStore {
 
   async get(name: string): Promise<Trace | null> {
     return this.traces.get(name) ?? null;
+  }
+}
+
+export class FakeCompiler implements Compiler {
+  readonly requests: CompileRequest[] = [];
+  reply: string;
+
+  constructor(reply = "") {
+    this.reply = reply;
+  }
+
+  async run(req: CompileRequest): Promise<string> {
+    this.requests.push(req);
+    return this.reply;
   }
 }

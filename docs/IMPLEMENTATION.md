@@ -31,7 +31,7 @@ Separate fakes in `@tyto/core/testing`.
 | `browser-events.ts` | `BrowserEventSource.subscribe(session, signal)` → `AsyncIterable<StreamEvent>` |
 | `recipe-store.ts` | `get`, `list`, `save`, `remove` |
 | `trace-store.ts` | `save`, `get` |
-| `compiler.ts` | `compile(trace)`, `repair(recipe, misses, passes)` → recipe JSON |
+| `compiler.ts` | `Compiler.run({system, prompt, context})` → the model's final message (a session limited to `tyto compile-tool`) |
 | `session-lock.ts` | `acquire(session, timeoutMs)` → release function |
 | `log-marks.ts` | `get(session)`, `set(session, counts)`: log offsets taken when a page is opened |
 | `clock.ts`, `model.ts`, `redactor.ts`, `injection-guard.ts` | kept |
@@ -170,13 +170,27 @@ ones as params. `tyto learn` talks to its detached listener over a unix socket i
 - live: `records command/result pairs from the event stream and keeps only the named input`
 
 ### Slice 6 — compiler (Claude Code)
+`tyto compile <name>` builds the prompt (task and kept params outside the fence; every step and output inside a
+random-nonce fence labelled untrusted), runs `claude -p` in `~/.tyto/compile/<name>-*/` with `ANTHROPIC_API_KEY`
+removed, `--allowedTools "Bash(tyto compile-tool:*)"`, Write/Edit/Web/Task denied, and a `tyto` shim on PATH.
+`compile-tool draft` reads recipe JSON on stdin, validates, lints, and checks origins ⊆ the trace's origins;
+`compile-tool test dN --p v` runs a draft; `compile-tool ab …` probes in session `tyto-compile` (Tyto config, no
+logins, `--allowed-domains`, `--content-boundaries`). The final recipe is re-checked and stored as a draft.
+Verified: Claude Code refuses `tyto compile-tool … && touch …` as a whole (permission denial, nothing ran).
 - `the prompt fences trace page text with a random nonce and labels it as data`
 - `claude runs with only Bash(tyto compile-tool:*) allowed and without ANTHROPIC_API_KEY`
 - `compiler output that fails lint is rejected; valid output is stored as a draft`
 - `compile-tool ab pins session tyto-compile with --allowed-domains from the trace origins`
 - `compile-tool test runs the executor on the given params`
 - `recipes approve shows the steps and marks the recipe approved after confirmation`
-- live: `a compiled recipe passes lint and its self-test`; `compile-tool; rm is denied`
+- `the prompt includes the task, kept params with examples, origins, and every step's argv`; `warns the compiler when the trace is lossy`
+- `extracts recipe JSON from the final message, fenced or bare`
+- `a compiled recipe whose origins are outside the trace's origins is rejected`
+- `puts a tyto shim on PATH and sets TYTO_COMPILE_DIR with the compile context`; `a failed claude run is an error`
+- `compile-tool refuses to run outside a compile`; `compile-tool draft validates, lints, and saves a draft`
+- `tyto compile saves a valid compiled recipe as a draft and prints how to run it`
+- `recipes approve leaves the recipe a draft when not confirmed`; `--yes approves without asking`
+- live (`TYTO_LIVE_COMPILER=1`): `a compiled recipe passes lint and its self-test, then answers unseen inputs`
 
 Compiler card rules (from the measured prototype): never `@eN` refs; stable locators (URLs, `find`, CSS); no
 snapshot steps; parameterize what users vary; wait on signals; verification tied to page structure, not loose
