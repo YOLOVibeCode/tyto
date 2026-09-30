@@ -2,7 +2,13 @@ import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
-import { AgentBrowserRunner, StreamEventSource } from "@tyto/agent-browser";
+import { AgentBrowserRunner, StreamEventSource, agentBrowserSocketDir } from "@tyto/agent-browser";
+import { execFile } from "node:child_process";
+import { access, readFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { delimiter } from "node:path";
+import { promisify } from "node:util";
+import type { TytoSession } from "./doctor.ts";
 import { ClaudeCodeCompiler } from "@tyto/compiler";
 import { createInterface } from "node:readline/promises";
 import { text } from "node:stream/consumers";
@@ -10,6 +16,48 @@ import { Recorder, SecretRedactor } from "@tyto/core";
 import { FileLogMarks, FileSessionLock, FileTraceStore, FilesystemRecipeStore, ensureReplayFiles } from "@tyto/store";
 import { requestControl, serveControl } from "./learn/control.ts";
 import { runListener } from "./learn/listener.ts";
+
+const run = promisify(execFile);
+const TYTO_SESSIONS = ["tyto-rx", "tyto-rx-auth", "tyto-compile"];
+
+async function versionOf(bin: string): Promise<string | null> {
+  try {
+    const { stdout } = await run(bin, ["--version"], { timeout: 10_000 });
+    return /(\d+\.\d+\.\d+)/.exec(stdout)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function onPath(name: string, pathVar: string | undefined): Promise<string | null> {
+  for (const dir of (pathVar ?? "").split(delimiter).filter(Boolean)) {
+    const candidate = join(dir, name);
+    try {
+      await access(candidate, constants.X_OK);
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+async function runningSessions(env: NodeJS.ProcessEnv): Promise<TytoSession[]> {
+  const dir = agentBrowserSocketDir(env);
+  const out: TytoSession[] = [];
+  for (const session of TYTO_SESSIONS) {
+    const pid = Number((await readFile(join(dir, `${session}.pid`), "utf8").catch(() => "")).trim());
+    if (!pid) continue;
+    try {
+      process.kill(pid, 0);
+    } catch {
+      continue;
+    }
+    const version = (await readFile(join(dir, `${session}.version`), "utf8").catch(() => "")).trim() || null;
+    out.push({ session, pid, version });
+  }
+  return out;
+}
 
 const BIN = fileURLToPath(new URL("../bin/tyto.mjs", import.meta.url));
 const LISTEN_MAX_MS = 2 * 60 * 60 * 1000;
@@ -69,6 +117,19 @@ export async function composeDeps(env: NodeJS.ProcessEnv = process.env): Promise
       } finally {
         rl.close();
       }
+    },
+    setup: {
+      install: { home: homedir(), binDir: join(homedir(), ".local", "bin"), nodePath: process.execPath, cliBin: BIN },
+      doctor: {
+        nodeVersion: process.versions.node,
+        agentBrowserVersion: () => versionOf(env.TYTO_AGENT_BROWSER ?? "agent-browser"),
+        claudeVersion: () => versionOf("claude"),
+        launcher: () => onPath("tyto", env.PATH),
+        sessions: () => runningSessions(env),
+        closeSession: async (session) => {
+          await runner.run(["close"], { session });
+        },
+      },
     },
     out: (line) => process.stdout.write(`${line}\n`),
     err: (line) => process.stderr.write(`${line}\n`),

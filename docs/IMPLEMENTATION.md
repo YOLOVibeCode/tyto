@@ -216,10 +216,16 @@ prints a ready-to-run `tyto repair` command on stderr.
 - `tyto run records passing inputs in the regression list`; `tyto run prints a repair hint on a miss`
 
 ### Slice 8 — install and doctor
-- `install writes the tyto skill for Claude Code and Cursor without overwriting user edits`
-- `install updates the web-access rule to check tyto recipes first`
-- `doctor reports an agent-browser older than 0.38.1`
-- `doctor detects a tyto-rx daemon started with a different default timeout`
+`tyto install` writes `~/.local/bin/tyto` pinned to the installing Node (the user's default Node may be too old),
+the `tyto` skill for Claude Code and Cursor (tracked by hash in `~/.tyto/installed.json`; edited copies are kept),
+and replaces step 4 of the web-access rule once. agent-browser stores only a hash of a session's launch settings,
+so the doctor cannot read a daemon's timeout; it lists Tyto's running sessions and `--fix` closes them so they
+restart with Tyto's settings.
+- `writes the tyto launcher into the bin dir, pinned to this Node`
+- `install writes the tyto skill for Claude Code and Cursor`; `install does not overwrite a skill the user edited`
+- `install updates the web-access rule to check tyto recipes first, once`
+- `doctor reports an agent-browser older than 0.38.1`; `doctor reports a missing agent-browser and a missing launcher`
+- `doctor --fix closes Tyto's running sessions so they restart with Tyto's settings`
 
 ### Slice 9 — OpenAI-compatible compiler
 - `the tool-call loop runs compile-tool calls and stops on the final recipe JSON`
