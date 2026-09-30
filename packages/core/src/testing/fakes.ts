@@ -4,6 +4,9 @@ import type { Release, SessionLock } from "../ports/session-lock.ts";
 import type { Recipe } from "../recipe/types.ts";
 import type { LogCounts } from "../brief/types.ts";
 import type { LogMarks } from "../ports/log-marks.ts";
+import type { BrowserEventSource } from "../ports/browser-events.ts";
+import type { TraceStore } from "../ports/trace-store.ts";
+import type { StreamEvent, Trace } from "../trace/types.ts";
 import type { Clock } from "../ports/clock.ts";
 import type { ModelPort } from "../ports/model.ts";
 import type { CompleteRequest, CompleteResponse } from "../types.ts";
@@ -151,5 +154,46 @@ export class MemoryLogMarks implements LogMarks {
 
   async set(session: string, counts: LogCounts): Promise<void> {
     this.marks.set(session, counts);
+  }
+}
+
+/** Push-driven event stream for tests. `emit` delivers to the current subscriber. */
+export class FakeEventSource implements BrowserEventSource {
+  private queue: StreamEvent[] = [];
+  private wake: (() => void) | null = null;
+  subscribed: string[] = [];
+
+  emit(...events: StreamEvent[]): void {
+    this.queue.push(...events);
+    this.wake?.();
+  }
+
+  async *subscribe(session: string, signal: AbortSignal): AsyncIterable<StreamEvent> {
+    this.subscribed.push(session);
+    while (!signal.aborted) {
+      const next = this.queue.shift();
+      if (next) {
+        yield next;
+        if (next.type === "closed") return;
+        continue;
+      }
+      await new Promise<void>((resolve) => {
+        this.wake = resolve;
+        signal.addEventListener("abort", () => resolve(), { once: true });
+      });
+      this.wake = null;
+    }
+  }
+}
+
+export class MemoryTraceStore implements TraceStore {
+  readonly traces = new Map<string, Trace>();
+
+  async save(trace: Trace): Promise<void> {
+    this.traces.set(trace.name, trace);
+  }
+
+  async get(name: string): Promise<Trace | null> {
+    return this.traces.get(name) ?? null;
   }
 }
