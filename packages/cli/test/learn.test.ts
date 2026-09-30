@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Recorder, SecretRedactor, type BatchStepResult } from "@tyto/core";
-import { FakeBrowserRunner, FakeEventSource, FakeSessionLock, MemoryLogMarks, MemoryRecipeStore, MemoryTraceStore } from "@tyto/core/testing";
+import { FakeBrowserRunner, FakeCompiler, FakeEventSource, FakeSessionLock, MemoryLogMarks, MemoryRecipeStore, MemoryTraceStore } from "@tyto/core/testing";
 import { main, runListener, serveControl, requestControl, type CliDeps, type ControlReply, type ControlRequest } from "../src/index.ts";
 
 function harness(reply: (req: ControlRequest) => ControlReply) {
@@ -24,6 +24,10 @@ function harness(reply: (req: ControlRequest) => ControlReply) {
         return reply(req);
       },
     },
+    traces: new MemoryTraceStore(),
+    compiler: new FakeCompiler(),
+    compileTool: { dir: undefined, readStdin: async () => "" },
+    confirm: async () => false,
     out: (s) => out.push(s),
     err: (s) => out.push(`ERR ${s}`),
   };

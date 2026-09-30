@@ -8,3 +8,4 @@ export type { Release, SessionLock } from "./session-lock.ts";
 export type { LogMarks } from "./log-marks.ts";
 export type { BrowserEventSource } from "./browser-events.ts";
 export type { TraceStore } from "./trace-store.ts";
+export type { CompileContext, CompileRequest, Compiler } from "./compiler.ts";

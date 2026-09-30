@@ -4,11 +4,16 @@
   "private": true,
   "type": "module",
   "description": "The tyto command: learn browser tasks once, replay them with no model.",
-  "bin": { "tyto": "bin/tyto.mjs" },
-  "exports": { ".": "./src/index.ts" },
+  "bin": {
+    "tyto": "bin/tyto.mjs"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "dependencies": {
     "@tyto/agent-browser": "*",
     "@tyto/core": "*",
-    "@tyto/store": "*"
+    "@tyto/store": "*",
+    "@tyto/compiler": "*"
   }
 }
