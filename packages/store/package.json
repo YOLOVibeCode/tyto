@@ -1,0 +1,11 @@
+{
+  "name": "@tyto/store",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tyto files under ~/.tyto: recipes, session locks, replay config. Private (0600), atomic writes.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@tyto/core": "*"
+  }
+}
