@@ -199,10 +199,21 @@ themselves (`querySelectorAll(...)[n-1]`); never submit or delete unless the tra
 inputs (original plus two varied), each confirmed independently on the live page.
 
 ### Slice 7 — repair
+`tyto repair <name> --p v` reruns the input; on a MISS it sends the current recipe, the miss (reason fenced as
+untrusted), and the regression inputs to the compiler with a repair addendum. The candidate must keep the name,
+param names, and origins, pass lint, and hit on the missed input and every regression input before it replaces
+the old recipe. Repaired recipes are drafts; `auth` recipes skip live validation and must be approved again.
+Successful `tyto run`s append their inputs to `regression` (first case kept, most recent kept, max 10); a MISS
+prints a ready-to-run `tyto repair` command on stderr.
 - `on a miss, repair receives the missed inputs with reasons and the regression inputs`
 - `a repaired recipe keeps its name and params and must pass every regression input before replacing the old one`
 - `passing inputs are appended to regression, deduplicated, capped at 10`
 - `repair output that fails lint leaves the old recipe unchanged`
+- `a repaired recipe must keep its name and param names`; `a repaired recipe may not open new origins`
+- `a successful repair replaces the recipe and remembers the missed input`
+- `an input the recipe already answers needs no repair`
+- `a repaired auth recipe is saved as a draft that needs approval again`
+- `tyto run records passing inputs in the regression list`; `tyto run prints a repair hint on a miss`
 
 ### Slice 8 — install and doctor
 - `install writes the tyto skill for Claude Code and Cursor without overwriting user edits`

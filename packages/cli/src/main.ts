@@ -1,5 +1,7 @@
-import { EXIT, executeRecipe, type Compiler, type ExecDeps, type RecipeStore, type TraceStore } from "@tyto/core";
+import { EXIT, appendRegression, executeRecipe, type Compiler, type ExecDeps, type RecipeStore, type TraceStore } from "@tyto/core";
 import { approve, compile, compileTool, type CompileToolDeps } from "./compile/commands.ts";
+import { repair } from "./compile/repair.ts";
+import { UsageError, asStrings, paramFlags, parseParams, subset } from "./args.ts";
 import { ACTIONS, act, brief, find, open, type BrowseDeps } from "./browse.ts";
 import { learnCommand, type LearnDeps } from "./learn/commands.ts";
 
@@ -27,35 +29,13 @@ export const USAGE = `usage: tyto <command>
   tyto learn status <name>                typed inputs recorded so far (names only)
   tyto learn stop <name> --task "…" [--param input_N=name ...]   save the trace
   tyto compile <name>                     turn a recorded trace into a draft recipe (one model session)
+  tyto repair <recipe> [--param value ...] fix a recipe that missed on that input (one model session)
   tyto run <recipe> [--param value ...]   replay a recipe with no model (exit 0 hit, 3 miss)
   tyto test <recipe>                      run the recipe's regression cases
   tyto recipes [--json]                   list recipes
   tyto recipes show <recipe>              print a recipe
   tyto recipes approve <recipe> [--yes]   allow a recipe to run (required for recipes that use your logins)
   tyto recipes rm <recipe>                delete a recipe`;
-
-class UsageError extends Error {}
-
-function parseParams(args: readonly string[]): Record<string, string> {
-  const params: Record<string, string> = {};
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i] ?? "";
-    const m = /^--(\w+)(?:=(.*))?$/s.exec(arg);
-    if (!m?.[1]) throw new UsageError(`expected --param value, got ${arg}`);
-    if (m[2] !== undefined) params[m[1]] = m[2];
-    else {
-      const value = args[i + 1];
-      if (value === undefined) throw new UsageError(`--${m[1]} needs a value`);
-      params[m[1]] = value;
-      i += 1;
-    }
-  }
-  return params;
-}
-
-function subset(expected: Readonly<Record<string, unknown>>, actual: Record<string, unknown>): boolean {
-  return Object.entries(expected).every(([k, v]) => JSON.stringify(actual[k]) === JSON.stringify(v));
-}
 
 async function run(args: readonly string[], deps: CliDeps): Promise<number> {
   const [name, ...rest] = args;
@@ -65,13 +45,16 @@ async function run(args: readonly string[], deps: CliDeps): Promise<number> {
     deps.err(`unknown recipe: ${name} (see tyto recipes)`);
     return EXIT.usage;
   }
-  const outcome = await executeRecipe(recipe, parseParams(rest), deps.exec);
+  const params = parseParams(rest);
+  const outcome = await executeRecipe(recipe, params, deps.exec);
   switch (outcome.kind) {
     case "hit":
       deps.out(JSON.stringify(outcome.result));
+      await deps.store.save(appendRegression(recipe, asStrings(outcome.params))).catch(() => undefined);
       return EXIT.hit;
     case "miss":
       deps.out(JSON.stringify({ miss: outcome.miss, step: outcome.step }));
+      deps.err(`repair: tyto repair ${name} ${paramFlags(params)}`.trimEnd());
       return EXIT.miss;
     case "error":
       deps.err(outcome.message);
@@ -153,6 +136,8 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
         return await test(args, deps);
       case "recipes":
         return await recipes(args, deps);
+      case "repair":
+        return await repair(args, deps, deps);
       case "compile":
         return await compile(args, deps, deps);
       case "compile-tool":
