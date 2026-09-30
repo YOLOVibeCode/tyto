@@ -34,6 +34,8 @@ export type Recipe = {
   examples: readonly string[];
   /** Origins the recipe may open, e.g. "https://github.com". */
   origins: readonly string[];
+  /** Extra hosts the page may load resources from (CDNs), e.g. "github.githubassets.com" or "*.githubusercontent.com". */
+  domains: readonly string[];
   params: Readonly<Record<string, ParamSpec>>;
   steps: readonly Step[];
   verify: VerifyRule;

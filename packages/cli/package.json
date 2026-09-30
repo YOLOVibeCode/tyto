@@ -1,0 +1,14 @@
+{
+  "name": "@tyto/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The tyto command: learn browser tasks once, replay them with no model.",
+  "bin": { "tyto": "bin/tyto.mjs" },
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@tyto/agent-browser": "*",
+    "@tyto/core": "*",
+    "@tyto/store": "*"
+  }
+}

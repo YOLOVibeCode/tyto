@@ -2,3 +2,6 @@ export type { Clock } from "./clock.ts";
 export type { InjectionGuard } from "./injection-guard.ts";
 export type { ModelCatalog, ModelPort } from "./model.ts";
 export type { Redactor } from "./redactor.ts";
+export type { BatchStepResult, BrowserRunner, RunOptions, RunOutput } from "./browser-runner.ts";
+export type { RecipeStore, RecipeSummary } from "./recipe-store.ts";
+export type { Release, SessionLock } from "./session-lock.ts";

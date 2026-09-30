@@ -1,1 +1,10 @@
-export { FakeClock, FakeModel } from "./fakes.ts";
+export {
+  FakeBrowserRunner,
+  FakeClock,
+  FakeModel,
+  FakeSessionLock,
+  MemoryRecipeStore,
+  evalReturns,
+  stepFails,
+  type BatchScript,
+} from "./fakes.ts";
