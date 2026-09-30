@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseRecipe, type Recipe } from "@tyto/core";
-import { FileLogMarks, FileSessionLock, FilesystemRecipeStore, ensureReplayFiles } from "../src/index.ts";
+import { FileLogMarks, FileSessionLock, FileTraceStore, FilesystemRecipeStore, ensureReplayFiles } from "../src/index.ts";
 
 function recipe(name = "release", overrides: Record<string, unknown> = {}): Recipe {
   const parsed = parseRecipe({
@@ -114,5 +114,17 @@ describe("FileLogMarks", () => {
 
   it("refuses session names with path characters", async () => {
     await expect(new FileLogMarks(await tmp()).get("../x")).rejects.toThrow(/session/);
+  });
+});
+
+describe("FileTraceStore", () => {
+  it("saves traces with mode 0600 and loads them by name", async () => {
+    const dir = await tmp();
+    const store = new FileTraceStore(dir);
+    const trace = { name: "login", task: "log in", session: "s", startedAt: 1, stoppedAt: 2, lossy: false, gaps: [], origins: ["https://x.test"], params: {}, steps: [] };
+    await store.save(trace);
+    expect(await store.get("login")).toEqual(trace);
+    expect(await store.get("other")).toBeNull();
+    expect((await stat(join(dir, "login.json"))).mode & 0o777).toBe(0o600);
   });
 });

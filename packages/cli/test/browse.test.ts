@@ -59,6 +59,7 @@ function harness() {
     store: new MemoryRecipeStore(),
     exec: { runner, lock: new FakeSessionLock(), paths: { config: "/c.json", policy: "/p.json" } },
     browse: { runner, marks, redactor: new SecretRedactor(), session: "default", now: () => 1_790_000_000_000 },
+    learn: { spawnListener: async () => undefined, control: async () => ({ ok: false }) },
     out: (s) => out.push(s),
     err: (s) => out.push(`ERR ${s}`),
   };

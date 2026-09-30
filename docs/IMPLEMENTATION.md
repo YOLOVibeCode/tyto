@@ -28,9 +28,9 @@ Separate fakes in `@tyto/core/testing`.
 | Port | Shape |
 |---|---|
 | `browser-runner.ts` | `run(argv, opts)`, `batch(steps, opts)` → typed step results; opts carry session, env, AbortSignal |
-| `event-source.ts` | `subscribe(session, signal)` → `AsyncIterable<StreamEvent>` |
+| `browser-events.ts` | `BrowserEventSource.subscribe(session, signal)` → `AsyncIterable<StreamEvent>` |
 | `recipe-store.ts` | `get`, `list`, `save`, `remove` |
-| `trace-store.ts` | `save`, `get`, `latest` |
+| `trace-store.ts` | `save`, `get` |
 | `compiler.ts` | `compile(trace)`, `repair(recipe, misses, passes)` → recipe JSON |
 | `session-lock.ts` | `acquire(session, timeoutMs)` → release function |
 | `log-marks.ts` | `get(session)`, `set(session, counts)`: log offsets taken when a page is opened |
@@ -142,14 +142,32 @@ launch settings change mid-session, and the page is lost (observed: Edge fell ba
   `find locates text anywhere on the page`
 
 ### Slice 5 — recorder and traces
-- `learn opens the session and waits for the sync marker before recording`
+agent-browser's event stream (`<socketDir>/<session>.stream` holds the WebSocket port; socketDir follows
+`AGENT_BROWSER_SOCKET_DIR`, then `$XDG_RUNTIME_DIR/agent-browser`, then `~/.agent-browser`) reports **internal**
+action names (`navigate`, `getbylabel`, `waitforurl`, …), which `actionToArgv` maps back to CLI argv. Its
+`success` field is `false` even for successful commands, so success comes from the result's `error`. Typed values
+arrive in plaintext: the listener holds them in memory only; `tyto learn stop --param input_N=name` keeps chosen
+ones as params. `tyto learn` talks to its detached listener over a unix socket in `~/.tyto/learn/` (dir 0700).
+- `learn waits for the sync marker before recording`
 - `pairs command and result events by id into trace steps`
 - `marks the trace lossy on an orphan result, a missing result, or a socket close`
 - `ignores frame messages`
 - `replaces fill and type values with {{input_N}} placeholders`
 - `keeps only inputs named with --param and drops the rest`
 - `reduces cookie and storage values to names and lengths`
-- `runs the Redactor before the trace is saved`
+- `runs the Redactor before the trace is returned`
+- `actionToArgv maps navigate, click, fill, type, press, select, check, waits, eval, get, snapshot, and find locators`
+- `masks values typed into password-like fields and never offers them as params`
+- `collects the origins the task opened`; `keeps snapshot text and eval results as step output`
+- `StreamEventSource reads the port file and yields parsed events, dropping frames`; `yields a closed event when the socket closes`
+- `agentBrowserSocketDir follows agent-browser's socket directory rules`
+- `FileTraceStore saves traces with mode 0600 and loads them by name`
+- `tyto learn starts the session and a listener, then prints how to finish`; `tyto learn stop requires --task`
+- `tyto learn stop sends the task and kept params, then prints the trace summary`
+- `tyto learn status lists typed inputs by name and locator, never values`
+- `the listener records after the marker and saves the trace with kept params when stopped`
+- `control client and server exchange messages over a private socket`
+- live: `records command/result pairs from the event stream and keeps only the named input`
 
 ### Slice 6 — compiler (Claude Code)
 - `the prompt fences trace page text with a random nonce and labels it as data`

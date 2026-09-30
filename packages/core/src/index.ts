@@ -33,3 +33,8 @@ export {
   toRequests,
   type BriefParts,
 } from "./brief/collect.ts";
+export type { StreamEvent, Trace, TraceInput, TraceStep } from "./trace/types.ts";
+export { actionToArgv } from "./trace/argv.ts";
+export { buildTrace, type TraceOptions } from "./trace/build.ts";
+export { isSensitiveLocator } from "./recipe/lint.ts";
+export { Recorder, type RecorderDeps } from "./trace/recorder.ts";
