@@ -71,7 +71,8 @@ function renderArg(arg: string, params: Record<string, ParamValue>, origins: rea
   return out;
 }
 
-function utf8Base64(text: string): string {
+/** Base64 of the UTF-8 bytes, for `agent-browser eval -b`. */
+export function toBase64Utf8(text: string): string {
   let binary = "";
   for (const byte of new TextEncoder().encode(text)) binary += String.fromCharCode(byte);
   return btoa(binary);
@@ -86,7 +87,7 @@ export function renderRecipe(recipe: Recipe, input: Readonly<Record<string, stri
   try {
     const params = resolveParams(recipe, input);
     const steps = recipe.steps.map((step) => {
-      if (step[0] === "eval") return ["eval", "-b", utf8Base64(evalWithParams(step[1] ?? "", params))];
+      if (step[0] === "eval") return ["eval", "-b", toBase64Utf8(evalWithParams(step[1] ?? "", params))];
       const rendered = step.map((arg) => renderArg(arg, params, recipe.origins));
       if (rendered[0] === "open" && !inOrigins(rendered[1] ?? "", recipe.origins)) {
         throw new RenderError("rendered URL is outside the recipe's origins");

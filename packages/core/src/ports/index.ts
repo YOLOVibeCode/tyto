@@ -5,3 +5,4 @@ export type { Redactor } from "./redactor.ts";
 export type { BatchStepResult, BrowserRunner, RunOptions, RunOutput } from "./browser-runner.ts";
 export type { RecipeStore, RecipeSummary } from "./recipe-store.ts";
 export type { Release, SessionLock } from "./session-lock.ts";
+export type { LogMarks } from "./log-marks.ts";
