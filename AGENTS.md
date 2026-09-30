@@ -1,22 +1,19 @@
-# Agent instructions (Cursor Cloud + other coding agents)
+# Agent instructions (Cursor, Claude Code, other coding agents)
 
-Tyto is **TDD + ISP**. These instructions are mandatory. Detailed Cursor
-rules live in [`.cursor/rules/`](.cursor/rules/). Claude Code also reads
-[`CLAUDE.md`](./CLAUDE.md) and [`.claude/rules/`](.claude/rules/).
+Tyto is a thin layer on [agent-browser](https://github.com/vercel-labs/agent-browser): recipes (learn once,
+replay with no model, repair) and a one-call page brief. It is **TDD + ISP**. Detailed rules:
+[`.cursor/rules/`](.cursor/rules/) and [`.claude/rules/`](.claude/rules/); Claude Code also reads [`CLAUDE.md`](./CLAUDE.md).
 
 ## Non-negotiable
 
-1. **Red–green–refactor.** A failing test exists before production code.
-2. **`npm test` is offline.** No Chrome, no network, no keys. `TYTO_LIVE=1` is opt-in.
-3. **No god interfaces.** Ports in `packages/core/src/ports/` — one job each.
-4. **`@tyto/core` is pure.** No Playwright, no CDP socket, no vendor LLM SDK, no `LiteLLM` type.
-5. **Perch/MCP never see** `RawCdpPort` or `CredentialStorePort`.
-6. **Loopback only.** `127.0.0.1` + token. Never `0.0.0.0`.
-7. **Trusted CDP input** for clicks. Not `element.click()` as the product path.
-8. **No secrets in git.** Cookies/tokens never in session JSON, tape, or model prompts. Run `Redactor` first.
-9. After changes: `npm run check`.
-
-Do not promote `poc/` (Playwright spike) into product packages.
+1. **Red–green–refactor.** A failing spec-sentence test exists before production code.
+2. **`npm test` is offline.** No browser, no agent-browser binary, no network, no keys. Live tests: `npm run test:live`.
+3. **No god interfaces.** Ports in `packages/core/src/ports/`, one job each; separate fakes.
+4. **`@tyto/core` is pure.** No processes, files, network, WebSocket, browser drivers, vendor LLM SDKs.
+5. **Never re-implement agent-browser.** Call its CLI with an argv array; listen to its event stream.
+6. **Recipes pass lint before store or run.** Logged-in replay only for approved `auth` recipes.
+7. **No secrets in git, traces, recipes, or prompts.** `Redactor` first.
+8. After changes: `npm run check`.
 
 Full contract: [docs/IMPLEMENTATION.md](./docs/IMPLEMENTATION.md).
 

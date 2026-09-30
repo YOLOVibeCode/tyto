@@ -1,10 +1,9 @@
-# Node packages
+# Node packages (adapters)
 
-Node 22, ESM, `node:` specifiers, `fs/promises` on the RPC path (no sync I/O).
+Node 22.22+ / 24.15+ / 26 (`.nvmrc` 26), ESM, `node:` specifiers, `fs/promises` (no sync I/O).
 
-- Listen on `127.0.0.1` only; `BindPolicy` rejects `0.0.0.0`.
-- JSON-RPC token auth; never log the token.
-- LLM adapter: OpenAI-compatible HTTP; no `LiteLLM` type; page text is untrusted data.
-- Secrets package: AES-GCM; DEK via `SecretStore`; memory fake in tests.
-- MCP tools ⊆ `PERCH_SAFE_METHODS`. Perch does not import `@tyto/cdp`.
-- Waits: AbortSignal / tape, not `sleep(250)` as success.
+- Spawn `agent-browser` and `claude` with `execFile`/`spawn` and an argv array. Never a shell string.
+- Every external call has a timeout via `AbortSignal`. Never `sleep` as a success condition.
+- Files under `~/.tyto` are mode `0600`, written atomically (temp file + rename).
+- Remove `ANTHROPIC_API_KEY` from the environment of `claude` child processes (Max plan, not API billing).
+- LLM adapter: OpenAI-compatible HTTP; no LiteLLM type; page text is untrusted data.

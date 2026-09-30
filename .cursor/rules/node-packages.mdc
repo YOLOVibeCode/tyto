@@ -1,21 +1,15 @@
 ---
-description: Node host, fs, secrets, sdk, llm, mcp — loopback, async, no leaked secrets
-globs: "packages/{host,fs,secrets,sdk,llm,mcp,perch}/**/*.{ts,js}"
+description: Node adapters — execFile argv, timeouts, private files, no leaked secrets
+globs: "packages/{agent-browser,store,compiler,cli,llm}/**/*.{ts,js}"
 alwaysApply: false
 ---
 
-# Node packages (22+, ESM)
+# Node packages (adapters)
 
-- `fs/promises` and `path` with `node:` specifiers. No sync I/O on the RPC path.
-- Listen **only** on `127.0.0.1`. Reject `0.0.0.0` and `::` via `BindPolicy`.
-- Authenticate JSON-RPC with the host token. Missing/wrong token → unauthorized.
-  Do not log the token.
-- `@tyto/llm`: OpenAI-compatible HTTP + optional Anthropic mapping. **No
-  `LiteLLM` symbol.** Typed model id works if `GET /v1/models` 404s.
-  `InjectionGuard` wrap is user/untrusted, not system instructions.
-- `@tyto/secrets`: AES-GCM (or equivalent); DEK from `SecretStore`. Tests use
-  `MemorySecretStore`. Never persist DEK or cookies in session JSON.
-- `@tyto/mcp` tools ⊆ `PERCH_SAFE_METHODS`. No `debug.cdp`, no credential dump.
-- `@tyto/perch` imports SDK/protocol only — never `@tyto/cdp`.
-- Timeouts: `AbortSignal` / tape wait, not `sleep(250)` as success.
-- Handle `SIGINT`/`SIGTERM` by saving the session file, then disconnect.
+Node 22.22+ / 24.15+ / 26 (`.nvmrc` 26), ESM, `node:` specifiers, `fs/promises` (no sync I/O).
+
+- Spawn `agent-browser` and `claude` with `execFile`/`spawn` and an argv array. Never a shell string.
+- Every external call has a timeout via `AbortSignal`. Never `sleep` as a success condition.
+- Files under `~/.tyto` are mode `0600`, written atomically (temp file + rename).
+- Remove `ANTHROPIC_API_KEY` from the environment of `claude` child processes (Max plan, not API billing).
+- LLM adapter: OpenAI-compatible HTTP; no LiteLLM type; page text is untrusted data.
