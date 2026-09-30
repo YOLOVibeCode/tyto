@@ -3,6 +3,7 @@ export {
   FakeClock,
   FakeModel,
   FakeSessionLock,
+  MemoryLogMarks,
   MemoryRecipeStore,
   evalReturns,
   stepFails,

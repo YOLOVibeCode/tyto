@@ -33,6 +33,7 @@ Separate fakes in `@tyto/core/testing`.
 | `trace-store.ts` | `save`, `get`, `latest` |
 | `compiler.ts` | `compile(trace)`, `repair(recipe, misses, passes)` → recipe JSON |
 | `session-lock.ts` | `acquire(session, timeoutMs)` → release function |
+| `log-marks.ts` | `get(session)`, `set(session, counts)`: log offsets taken when a page is opened |
 | `clock.ts`, `model.ts`, `redactor.ts`, `injection-guard.ts` | kept |
 
 ## 3. Recipe format (v1)
@@ -119,6 +120,9 @@ Each slice: tests first, then code, `npm run check` green, one PR.
 - live: `a fixture recipe hits, then misses after the page changes`; `a missing locator fails in under 7 s`
 
 ### Slice 4 — brief, find, act
+Browse commands run in the agent's own session (`--session`, default `$AGENT_BROWSER_SESSION` or `default`) with
+the user's agent-browser config. They never pass env overrides: agent-browser restarts a session's browser when
+launch settings change mid-session, and the page is lost (observed: Edge fell back to its new-tab page).
 - `brief lists failed Fetch/XHR requests with a redacted response snippet`
 - `brief lists uncaught errors and console errors and warnings`
 - `brief scopes console, errors, and requests to the current navigation by offsets`
@@ -129,6 +133,13 @@ Each slice: tests first, then code, `npm run check` green, one PR.
 - `find with a locator keyword passes through to agent-browser find`
 - `act reports navigation, new requests, errors, and console since the action`
 - `bare e12 refs are rewritten to @e12`
+- `tyto open marks the logs, opens the page, and prints the brief`; `tyto brief --json prints the brief as JSON`
+- `--session selects the agent-browser session`
+- `browse commands never change agent-browser settings mid-session (a changed setting restarts the browser)`
+- `agent-browser restore status lines are not echoed`
+- `FileLogMarks returns zero offsets for an unknown session and round-trips saved offsets with mode 0600`
+- live: `the brief shows a planted 500 with its body and the console error`; `a click reports the uncaught TypeError`;
+  `find locates text anywhere on the page`
 
 ### Slice 5 — recorder and traces
 - `learn opens the session and waits for the sync marker before recording`

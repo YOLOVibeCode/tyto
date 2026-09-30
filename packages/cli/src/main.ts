@@ -1,14 +1,21 @@
 import { EXIT, executeRecipe, type ExecDeps, type RecipeStore } from "@tyto/core";
+import { ACTIONS, act, brief, find, open, type BrowseDeps } from "./browse.ts";
 
 export type CliDeps = {
   store: RecipeStore;
   exec: ExecDeps;
+  browse: BrowseDeps;
   out: (line: string) => void;
   err: (line: string) => void;
 };
 
 export const USAGE = `usage: tyto <command>
 
+  tyto open <url> [--session s] [--json]  open a page and print its brief (errors, network, state, elements)
+  tyto brief [--session s] [--json]       brief of the current page
+  tyto find <words> [--session s]         search the whole page text
+  tyto click|fill|type|press|select|check|uncheck|hover|scroll|dblclick <args>
+                                          act through agent-browser, then print what happened
   tyto run <recipe> [--param value ...]   replay a recipe with no model (exit 0 hit, 3 miss)
   tyto test <recipe>                      run the recipe's regression cases
   tyto recipes [--json]                   list recipes
@@ -133,6 +140,12 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
         return await test(args, deps);
       case "recipes":
         return await recipes(args, deps);
+      case "open":
+        return await open(args, deps.browse, deps);
+      case "brief":
+        return await brief(args, deps.browse, deps);
+      case "find":
+        return await find(args, deps.browse, deps);
       case undefined:
       case "help":
       case "--help":
@@ -140,6 +153,7 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
         deps.out(USAGE);
         return EXIT.hit;
       default:
+        if (ACTIONS.has(command)) return await act(command, args, deps.browse, deps);
         throw new UsageError(`unknown command: ${command}`);
     }
   } catch (e) {
