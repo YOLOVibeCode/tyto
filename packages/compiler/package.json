@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "description": "Compiler adapters: run a model session that may only use `tyto compile-tool`.",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "dependencies": {
-    "@tyto/core": "*"
+    "@tyto/core": "*",
+    "@tyto/llm": "*"
   }
 }
