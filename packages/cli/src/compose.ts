@@ -9,7 +9,8 @@ import { constants } from "node:fs";
 import { delimiter } from "node:path";
 import { promisify } from "node:util";
 import type { TytoSession } from "./doctor.ts";
-import { ClaudeCodeCompiler } from "@tyto/compiler";
+import { ClaudeCodeCompiler, OpenAiCompatCompiler } from "@tyto/compiler";
+import type { Compiler } from "@tyto/core";
 import { createInterface } from "node:readline/promises";
 import { text } from "node:stream/consumers";
 import { Recorder, SecretRedactor } from "@tyto/core";
@@ -59,6 +60,18 @@ async function runningSessions(env: NodeJS.ProcessEnv): Promise<TytoSession[]> {
   return out;
 }
 
+/** TYTO_COMPILER=claude (default: Claude Code headless) or openai (TYTO_BASE_URL, TYTO_MODEL, optional TYTO_API_KEY). */
+export function selectCompiler(env: NodeJS.ProcessEnv, opts: { tytoBin: string; workRoot: string }): Compiler {
+  const which = env.TYTO_COMPILER && env.TYTO_COMPILER !== "" ? env.TYTO_COMPILER : "claude";
+  if (which === "claude") return new ClaudeCodeCompiler({ ...opts, model: env.TYTO_COMPILER_MODEL ?? "sonnet", baseEnv: env });
+  if (which === "openai") {
+    if (!env.TYTO_BASE_URL) throw new Error("TYTO_COMPILER=openai needs TYTO_BASE_URL (e.g. http://127.0.0.1:11434/v1)");
+    if (!env.TYTO_MODEL) throw new Error("TYTO_COMPILER=openai needs TYTO_MODEL");
+    return new OpenAiCompatCompiler({ ...opts, baseUrl: new URL(env.TYTO_BASE_URL), apiKey: env.TYTO_API_KEY ?? "", model: env.TYTO_MODEL, baseEnv: env });
+  }
+  throw new Error(`TYTO_COMPILER must be claude or openai, not ${which}`);
+}
+
 const BIN = fileURLToPath(new URL("../bin/tyto.mjs", import.meta.url));
 const LISTEN_MAX_MS = 2 * 60 * 60 * 1000;
 import type { CliDeps } from "./main.ts";
@@ -104,7 +117,8 @@ export async function composeDeps(env: NodeJS.ProcessEnv = process.env): Promise
       },
     },
     traces: new FileTraceStore(join(home, "traces")),
-    compiler: new ClaudeCodeCompiler({ tytoBin: BIN, workRoot: join(home, "compile"), model: env.TYTO_COMPILER_MODEL ?? "sonnet", baseEnv: env }),
+    // Resolved on use, so a misconfigured compiler only affects `tyto compile` and `tyto repair`.
+    compiler: { run: (req) => selectCompiler(env, { tytoBin: BIN, workRoot: join(home, "compile") }).run(req) },
     compileTool: {
       dir: env.TYTO_COMPILE_DIR && env.TYTO_COMPILE_DIR !== "" ? env.TYTO_COMPILE_DIR : undefined,
       readStdin: () => text(process.stdin),

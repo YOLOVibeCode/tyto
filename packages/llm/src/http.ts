@@ -10,13 +10,13 @@ export function asRecord(v: unknown): Record<string, unknown> | undefined {
 
 export async function requestJson(
   url: URL,
-  init: { method: string; headers: Record<string, string>; body?: string },
+  init: { method: string; headers: Record<string, string>; body?: string; timeoutMs?: number },
 ): Promise<{ status: number; json: unknown }> {
   const res = await fetch(url, {
     method: init.method,
     headers: init.headers,
     ...(init.body !== undefined ? { body: init.body } : {}),
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(init.timeoutMs ?? 60_000),
   });
   if (res.status === 404) {
     await res.arrayBuffer();

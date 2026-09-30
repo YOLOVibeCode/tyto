@@ -13,7 +13,7 @@ two things it doesn't do:
   bodies, JavaScript errors, console errors, API calls, masked cookies, interactive elements, text. `tyto find`
   searches the whole page. Any model, including small local ones, gets there in one call.
 
-> **Status:** being rebuilt (2026-09-30) per [docs/IMPLEMENTATION.md](./docs/IMPLEMENTATION.md). The previous
+> **Status:** rebuilt (2026-09-30) per [docs/IMPLEMENTATION.md](./docs/IMPLEMENTATION.md), slices 1–9. The previous
 > design (its own CDP browser stack) is archived at tag `archive/tyto-v0`; why:
 > [docs/DECISION-2026-09-29-agent-browser.md](./docs/DECISION-2026-09-29-agent-browser.md).
 
@@ -28,7 +28,9 @@ two things it doesn't do:
 ## Install
 
 Needs [agent-browser](https://github.com/vercel-labs/agent-browser) ≥ 0.38.1 and Node 22.22+/24.15+/26;
-`tyto compile` also needs [Claude Code](https://claude.com/claude-code).
+`tyto compile` uses [Claude Code](https://claude.com/claude-code) by default, or any OpenAI-compatible model
+(for example a local Ollama model: `TYTO_COMPILER=openai TYTO_BASE_URL=http://127.0.0.1:11434/v1
+TYTO_MODEL=qwen3-coder:30b`).
 
 ```bash
 brew install agent-browser && agent-browser install
@@ -78,10 +80,10 @@ npm run test:live    # opt-in: needs agent-browser installed
 | Package | Role |
 |---|---|
 | `@tyto/core` | Recipes, lint, verify, brief, find, redaction, ports, fakes (pure) |
-| `@tyto/llm` | OpenAI-compatible and Anthropic HTTP model adapters |
+| `@tyto/llm` | OpenAI-compatible (with tool calls) and Anthropic HTTP model adapters |
 | `@tyto/agent-browser` | Runs the agent-browser CLI (argv, batch JSON); reads its event stream |
 | `@tyto/store` | Recipes, traces, session locks, log marks, replay config under `~/.tyto` |
 | `@tyto/cli` | The `tyto` command (`learn`, `compile`, `run`, `test`, `recipes`, `open`, `brief`, `find`, actions) |
-| `@tyto/compiler` | Runs the compiler session (Claude Code headless) limited to `tyto compile-tool` |
+| `@tyto/compiler` | Compiler sessions limited to `tyto compile-tool`: Claude Code headless, or any OpenAI-compatible model |
 
 A [YOLOVibeCode](https://github.com/YOLOVibeCode) public repo. Product: Noctusoft, Inc. MIT license.

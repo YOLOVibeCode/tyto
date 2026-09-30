@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
-import { chmod, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { CompileRequest, Compiler } from "@tyto/core";
+import { prepareWorkdir } from "./workdir.ts";
 
 export type ClaudeCodeCompilerOptions = {
   /** Path to the Tyto CLI entry (bin/tyto.mjs); exposed to the model as `tyto` on PATH. */
@@ -27,14 +27,7 @@ export class ClaudeCodeCompiler implements Compiler {
   }
 
   async run(req: CompileRequest): Promise<string> {
-    await mkdir(this.#opts.workRoot, { recursive: true, mode: 0o700 });
-    const dir = await mkdtemp(join(this.#opts.workRoot, `${req.context.name}-`));
-    await mkdir(join(dir, "bin"), { mode: 0o700 });
-    await writeFile(join(dir, "context.json"), JSON.stringify(req.context), { mode: 0o600 });
-    const shim = join(dir, "bin", "tyto");
-    await writeFile(shim, `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(this.#opts.tytoBin)} "$@"\n`, { mode: 0o700 });
-    await chmod(shim, 0o700);
-
+    const dir = await prepareWorkdir(this.#opts.workRoot, req.context, this.#opts.tytoBin, process.execPath);
     const { ANTHROPIC_API_KEY: _key, ...base } = this.#opts.baseEnv ?? process.env;
     const env = { ...base, PATH: `${join(dir, "bin")}:${base.PATH ?? ""}`, TYTO_COMPILE_DIR: dir };
     const args = [

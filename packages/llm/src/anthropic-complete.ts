@@ -12,7 +12,10 @@ export type AnthropicOptions = {
 export class AnthropicModel implements ModelPort {
   private readonly inject: InjectionGuard;
 
-  constructor(private readonly opts: AnthropicOptions) {
+  private readonly opts: AnthropicOptions;
+
+  constructor(opts: AnthropicOptions) {
+    this.opts = opts;
     this.inject = resolveInject(opts.inject);
   }
 
