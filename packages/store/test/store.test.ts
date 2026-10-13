@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseRecipe, type Recipe } from "@tyto/core";
-import { FileSessionLock, FilesystemRecipeStore, ensureReplayFiles } from "../src/index.ts";
+import { FileLogMarks, FileSessionLock, FilesystemRecipeStore, ensureReplayFiles } from "../src/index.ts";
 
 function recipe(name = "release", overrides: Record<string, unknown> = {}): Recipe {
   const parsed = parseRecipe({
@@ -99,5 +99,20 @@ describe("ensureReplayFiles", () => {
     const home = await tmp();
     const paths = await ensureReplayFiles(join(home, "tyto"), join(home, "missing.json"));
     expect(JSON.parse(await readFile(paths.config, "utf8"))).toEqual({});
+  });
+});
+
+describe("FileLogMarks", () => {
+  it("returns zero offsets for an unknown session and round-trips saved offsets with mode 0600", async () => {
+    const dir = await tmp();
+    const marks = new FileLogMarks(dir);
+    expect(await marks.get("default")).toEqual({ console: 0, errors: 0, requests: 0 });
+    await marks.set("task-7", { console: 2, errors: 1, requests: 5 });
+    expect(await marks.get("task-7")).toEqual({ console: 2, errors: 1, requests: 5 });
+    expect((await stat(join(dir, "task-7.json"))).mode & 0o777).toBe(0o600);
+  });
+
+  it("refuses session names with path characters", async () => {
+    await expect(new FileLogMarks(await tmp()).get("../x")).rejects.toThrow(/session/);
   });
 });

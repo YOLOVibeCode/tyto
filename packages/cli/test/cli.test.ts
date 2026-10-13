@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseRecipe, type Recipe } from "@tyto/core";
-import { FakeBrowserRunner, FakeSessionLock, MemoryRecipeStore, evalReturns, stepFails } from "@tyto/core/testing";
+import { SecretRedactor } from "@tyto/core";
+import { FakeBrowserRunner, FakeSessionLock, MemoryLogMarks, MemoryRecipeStore, evalReturns, stepFails } from "@tyto/core/testing";
 import { main, type CliDeps } from "../src/index.ts";
 
 function recipe(overrides: Record<string, unknown> = {}): Recipe {
@@ -25,6 +26,7 @@ function harness(runner = new FakeBrowserRunner(evalReturns(JSON.stringify({ tag
   const deps: CliDeps = {
     store: new MemoryRecipeStore(...(recipes.length ? recipes : [recipe()])),
     exec: { runner, lock: new FakeSessionLock(), paths: { config: "/c.json", policy: "/p.json" } },
+    browse: { runner, marks: new MemoryLogMarks(), redactor: new SecretRedactor(), session: "default", now: () => 0 },
     out: (s) => out.push(s),
     err: (s) => err.push(s),
   };

@@ -2,6 +2,8 @@ import type { BatchStepResult, BrowserRunner, RunOptions, RunOutput } from "../p
 import type { RecipeStore, RecipeSummary } from "../ports/recipe-store.ts";
 import type { Release, SessionLock } from "../ports/session-lock.ts";
 import type { Recipe } from "../recipe/types.ts";
+import type { LogCounts } from "../brief/types.ts";
+import type { LogMarks } from "../ports/log-marks.ts";
 import type { Clock } from "../ports/clock.ts";
 import type { ModelPort } from "../ports/model.ts";
 import type { CompleteRequest, CompleteResponse } from "../types.ts";
@@ -53,6 +55,8 @@ export class FakeBrowserRunner implements BrowserRunner {
   readonly runs: Array<{ argv: readonly string[]; opts: RunOptions }> = [];
   private scripts: BatchScript[];
   runOutput: RunOutput = { exitCode: 0, stdout: "", stderr: "" };
+  /** Optional per-call answer for `run`; falls back to `runOutput`. */
+  onRun?: (argv: readonly string[], opts: RunOptions) => RunOutput;
 
   constructor(...scripts: BatchScript[]) {
     this.scripts = scripts;
@@ -60,7 +64,7 @@ export class FakeBrowserRunner implements BrowserRunner {
 
   async run(argv: readonly string[], opts: RunOptions): Promise<RunOutput> {
     this.runs.push({ argv, opts });
-    return this.runOutput;
+    return this.onRun ? this.onRun(argv, opts) : this.runOutput;
   }
 
   async batch(steps: readonly (readonly string[])[], opts: RunOptions): Promise<BatchStepResult[]> {
@@ -135,5 +139,17 @@ export class FakeSessionLock implements SessionLock {
     return async () => {
       this.held.delete(session);
     };
+  }
+}
+
+export class MemoryLogMarks implements LogMarks {
+  readonly marks = new Map<string, LogCounts>();
+
+  async get(session: string): Promise<LogCounts> {
+    return this.marks.get(session) ?? { console: 0, errors: 0, requests: 0 };
+  }
+
+  async set(session: string, counts: LogCounts): Promise<void> {
+    this.marks.set(session, counts);
   }
 }
