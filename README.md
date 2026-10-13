@@ -36,8 +36,10 @@ tyto compile wiki-status                            # one model session → a ve
 tyto run wiki-status --species "Tiger"              # {"status":"Endangered",…} in ~0.3 s, no model
 ```
 
-A recipe that can't find what it expects returns a **MISS** (exit 3) instead of guessing. Recipes that use your
-saved logins run only after `tyto recipes approve`. For one-off pages, `tyto open <url>` prints the brief.
+A recipe that can't find what it expects returns a **MISS** (exit 3) instead of guessing, and prints the
+`tyto repair …` command that fixes it (one model session; the fix must still pass every input that worked
+before). Recipes that use your saved logins run only after `tyto recipes approve`. For one-off pages,
+`tyto open <url>` prints the brief.
 
 ## Measured (2026-09-29, M4 Max)
 

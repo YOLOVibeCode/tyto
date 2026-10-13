@@ -43,3 +43,4 @@ export { compilerPrompt } from "./compile/prompt.ts";
 export { extractRecipeJson } from "./compile/extract.ts";
 export { checkCompiled, type CheckResult } from "./compile/check.ts";
 export { compileTrace, type CompileOutcome } from "./compile/compile.ts";
+export { REPAIR_ADDENDUM, appendRegression, checkRepaired, repairPrompt, repairRecipe, type Miss, type RepairOutcome } from "./compile/repair.ts";
