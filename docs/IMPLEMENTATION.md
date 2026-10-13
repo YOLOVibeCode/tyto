@@ -228,8 +228,19 @@ restart with Tyto's settings.
 - `doctor --fix closes Tyto's running sessions so they restart with Tyto's settings`
 
 ### Slice 9 — OpenAI-compatible compiler
+`TYTO_COMPILER=openai` with `TYTO_BASE_URL` and `TYTO_MODEL` (optional `TYTO_API_KEY`) compiles with any
+OpenAI-compatible endpoint (Ollama, proxies). The model's only tool, `tyto_compile_tool`, runs
+`node <tyto> compile-tool <argv>` with an argv array (a string is split like a command line, never by a shell) and
+optional stdin for drafts. The compiler is resolved lazily, so a bad setting only affects compile and repair.
+`@tyto/llm` no longer uses TypeScript parameter properties (Node's strip-only mode rejects them) and its request
+timeout is configurable. Verified: local Qwen3-coder 30B compiled the loopback fixture in 42 s and the real
+Wikipedia task in 194 s (6/6 species correct afterwards, no model).
 - `the tool-call loop runs compile-tool calls and stops on the final recipe JSON`
+- `tool calls run tyto compile-tool with an argv array, never a shell`; `a string of args is split like a command line`
+- `gives up after the turn limit`
+- `chatWithTools posts messages and tools and returns tool calls`; `the request timeout is configurable`
 - `config selects the compiler: claude (default) or openai with baseUrl and model`
+- `openai without a base URL or model is a clear error`
 
 Later: request → recipe routing without a model (local embeddings), session pool, MCP.
 

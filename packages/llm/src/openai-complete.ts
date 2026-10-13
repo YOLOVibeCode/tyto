@@ -12,7 +12,10 @@ export type OpenAiCompatOptions = {
 export class OpenAiCompatModel implements ModelPort {
   private readonly inject: InjectionGuard;
 
-  constructor(private readonly opts: OpenAiCompatOptions) {
+  private readonly opts: OpenAiCompatOptions;
+
+  constructor(opts: OpenAiCompatOptions) {
+    this.opts = opts;
     this.inject = resolveInject(opts.inject);
   }
 
