@@ -17,8 +17,8 @@ Separate fakes in `@tyto/core/testing`.
 | Package | Role |
 |---|---|
 | `packages/core` | Recipe schema, lint, render, verify; trace model; brief assembly and rendering; find; redaction; ports; fakes |
-| `packages/agent-browser` | `BrowserRunner` and `EventSource` adapters: `execFile` argv, batch via stdin JSON, stream WebSocket, session lock |
-| `packages/store` | `~/.tyto/{recipes,traces,locks}`, JSON, `0600`, atomic writes |
+| `packages/agent-browser` | `BrowserRunner` and `EventSource` adapters: spawn with an argv array, batch via stdin JSON, stream WebSocket |
+| `packages/store` | `~/.tyto/{recipes,traces,locks}`: recipe store, session lock, replay config files; JSON, `0600`, atomic writes |
 | `packages/compiler` | `ClaudeCodeCompiler` (default), `OpenAiCompatCompiler` (slice 9) |
 | `packages/llm` | OpenAI-compatible and Anthropic HTTP `ModelPort`s (kept); tool calls added in slice 9 |
 | `packages/cli` | `tyto` command |
@@ -40,6 +40,7 @@ Separate fakes in `@tyto/core/testing`.
 ```json
 { "name": "github-release-info", "version": 1, "status": "draft", "auth": false,
   "intent": "…", "examples": ["…"], "origins": ["https://github.com"],
+  "domains": ["github.githubassets.com", "*.githubusercontent.com"],
   "params": { "repo": { "type": "string", "description": "owner/name", "example": "vercel-labs/agent-browser" },
               "n": { "type": "int", "description": "position", "example": "1", "default": "1" } },
   "steps": [["open", "https://github.com/{{repo|path}}/releases"], ["wait", "--load", "load"],
@@ -50,17 +51,20 @@ Separate fakes in `@tyto/core/testing`.
 
 Filters: `{{p}}`, `{{p|lower}}`, `{{p|underscore}}`, `{{p|path}}` (percent-encode, keep `/`), `{{p|url}}`
 (full URL; origin must be in `origins`). Param types: `string`, `int`, `enum` (with `values`).
+`origins` limits what the recipe may open; `domains` adds hosts the page may load resources from (CDNs); both
+feed agent-browser's `--allowed-domains` in `tyto-rx`.
 
 **Executor.** lint → render (defaults, types) → prepend `const params = JSON.parse(<double-encoded>);` to eval
 code → base64 (`eval -b`) → one `batch --bail --json` → last eval parsed as a JSON object → verify
 (non-strings compared JSON-style; params regex-escaped in `match`).
-Exit codes: 0 hit · 3 MISS `{miss, step}` · 64 usage · 69 agent-browser missing · 70 internal/agent-browser
-error · 75 session busy · 77 auth recipe not approved.
-Timeouts: `AGENT_BROWSER_DEFAULT_TIMEOUT=6000`, explicit `--timeout` on waits, 15 s overall deadline. Retry the
-batch once only on browser launch errors.
+Exit codes: 0 hit · 3 MISS `{miss, step}` · 64 usage/bad params · 65 recipe fails parse or lint · 69
+agent-browser missing · 70 internal/agent-browser error · 75 session busy · 77 auth recipe not approved.
+Timeouts: `AGENT_BROWSER_DEFAULT_TIMEOUT=6000` in the batch environment (waits read it per call; clicks and fills
+read it when the `tyto-rx` daemon starts, which Tyto does), 15 s overall deadline. Retry the batch once only on
+browser launch errors.
 
-**Sessions.** `tyto-rx`: Tyto-owned agent-browser config (copies `executablePath` from the user's config; no
-restore) with `--allowed-domains <origins>`. `tyto-rx-auth`: `--restore main`, only for approved `auth` recipes.
+**Sessions.** `tyto-rx`: Tyto-owned agent-browser config via `AGENT_BROWSER_CONFIG`, which replaces the user's
+config entirely (keeps only `executablePath`; no restore), with `--allowed-domains <origin hosts + domains>`. `tyto-rx-auth`: `--restore main`, only for approved `auth` recipes.
 Both use an action policy denying download and upload.
 
 ## 4. Slices and spec sentences
@@ -95,18 +99,24 @@ Each slice: tests first, then code, `npm run check` green, one PR.
 
 ### Slice 3 — executor, adapter, store, `tyto run`
 - `runs all steps as one batch in session tyto-rx with --allowed-domains from origins`
-- `a hit prints the result JSON and exits 0`
-- `a failing step misses with exit 3 and the step index`
+- `the domain allowlist also includes the recipe's extra network domains`
+- `a hit returns the verified result`; `tyto run prints the result JSON and exits 0 on a hit`
+- `a failing step misses with the step index`; `tyto run prints the miss and exits 3`
+- `a verify failure after a successful batch misses at the last step`
 - `retries once on a browser launch error and never on element-not-found`
-- `sets AGENT_BROWSER_DEFAULT_TIMEOUT and adds --timeout to wait steps`
+- `sets AGENT_BROWSER_DEFAULT_TIMEOUT and the Tyto config for the batch`
 - `stops at the overall deadline with exit 70`
 - `an auth recipe runs in tyto-rx-auth only when approved, otherwise exits 77`
-- `a busy session exits 75 after the lock wait`
+- `a busy session exits 75`; `the session lock is released after the run`
 - `a missing agent-browser binary exits 69`
-- `recipes that fail lint are refused before any browser call`
+- `recipes that fail lint exit 65 before any browser call`; `bad params exit 64 before any browser call`
 - `BrowserRunner.batch sends steps as JSON on stdin and parses results` (stub executable, no browser)
+- `run puts --session and session args before the command`; `abort kills the child process`
 - `FilesystemRecipeStore writes atomically with mode 0600 and rejects invalid recipes`
-- `tyto recipes lists name, intent, and params`
+- `FileSessionLock gives the lock to one holder at a time` and `reclaims a lock whose holder process is gone`
+- `ensureReplayFiles writes a Tyto agent-browser config with only executablePath and a policy denying download and upload`
+- `tyto recipes lists name, intent, and params`; `tyto test runs every regression case and exits 3 if any fails`
+- live: `a fixture recipe hits, then misses after the page changes`; `a missing locator fails in under 7 s`
 
 ### Slice 4 — brief, find, act
 - `brief lists failed Fetch/XHR requests with a redacted response snippet`

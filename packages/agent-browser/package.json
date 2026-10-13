@@ -1,0 +1,11 @@
+{
+  "name": "@tyto/agent-browser",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "BrowserRunner adapter: runs the agent-browser CLI with an argv array.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@tyto/core": "*"
+  }
+}

@@ -5,13 +5,16 @@
   "description": "Learn-once, replay-fast browser recipes and one-call page briefs, on top of agent-browser.",
   "workspaces": [
     "packages/core",
-    "packages/llm"
+    "packages/llm",
+    "packages/agent-browser",
+    "packages/store",
+    "packages/cli"
   ],
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
     "test:live": "TYTO_LIVE=1 vitest run",
-    "typecheck": "tsc --noEmit -p packages/core && tsc --noEmit -p packages/llm",
+    "typecheck": "tsc --noEmit -p packages/core && tsc --noEmit -p packages/llm && tsc --noEmit -p packages/agent-browser && tsc --noEmit -p packages/store && tsc --noEmit -p packages/cli",
     "secrets:scan": "node scripts/check-secrets.mjs",
     "lint:imports": "node scripts/check-core-imports.mjs",
     "check": "npm run lint:imports && npm run secrets:scan && npm test && npm run typecheck"

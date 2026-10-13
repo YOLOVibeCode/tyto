@@ -3,6 +3,7 @@ import type { ParamSpec, ParamType, Recipe, RecipeStatus, RegressionCase, Step, 
 export type ParseResult = { ok: true; recipe: Recipe } | { ok: false; errors: string[] };
 
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const DOMAIN = /^(?:\*\.)?(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9-]+$|^(?:\d{1,3}\.){3}\d{1,3}$/i;
 const PARAM_TYPES: readonly ParamType[] = ["string", "int", "enum"];
 const STATUSES: readonly RecipeStatus[] = ["draft", "approved"];
 
@@ -115,6 +116,10 @@ export function parseRecipe(input: unknown): ParseResult {
   if (!isStringArray(origins) || origins.length === 0) errors.push("origins must be a non-empty string array");
   else for (const o of origins) if (!isOrigin(o)) errors.push(`origin ${o} must look like https://host[:port]`);
 
+  const domains = input.domains ?? [];
+  if (!isStringArray(domains)) errors.push("domains must be a string array");
+  else for (const d of domains) if (!DOMAIN.test(d)) errors.push(`domain ${d} must be a host name or *.host`);
+
   const params: Record<string, ParamSpec> = {};
   if (input.params !== undefined) {
     if (!isRecord(input.params)) errors.push("params must be an object");
@@ -150,6 +155,7 @@ export function parseRecipe(input: unknown): ParseResult {
       intent: input.intent as string,
       examples: examples as string[],
       origins: origins as string[],
+      domains: domains as string[],
       params,
       steps,
       verify,

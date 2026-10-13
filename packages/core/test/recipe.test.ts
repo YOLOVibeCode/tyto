@@ -49,6 +49,16 @@ describe("parseRecipe", () => {
     expect(r.steps).toHaveLength(3);
   });
 
+  it("accepts extra network domains and rejects malformed ones", () => {
+    expect(recipe({ domains: ["github.githubassets.com", "*.githubusercontent.com"] }).domains).toEqual([
+      "github.githubassets.com",
+      "*.githubusercontent.com",
+    ]);
+    for (const bad of ["https://cdn.test", "cdn.test/path", "*", "a b.test"]) {
+      expect(parseRecipe(base({ domains: [bad] })).ok, bad).toBe(false);
+    }
+  });
+
   it("rejects a recipe whose last step is not eval", () => {
     const parsed = parseRecipe(base({ steps: [["open", "https://github.com/"], ["wait", "--load", "load"]] }));
     expect(parsed.ok).toBe(false);
