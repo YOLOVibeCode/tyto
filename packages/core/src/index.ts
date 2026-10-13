@@ -3,3 +3,8 @@ export * from "./ports/index.ts";
 export { PageTextGuard, SYSTEM_PREAMBLE } from "./policy/inject.ts";
 export { SecretRedactor } from "./identity/redact.ts";
 export { SystemClock } from "./clock/system.ts";
+export type { ParamSpec, ParamType, ParamValue, Recipe, RecipeStatus, RegressionCase, Step, VerifyRule } from "./recipe/types.ts";
+export { parseRecipe, type ParseResult } from "./recipe/parse.ts";
+export { lintRecipe } from "./recipe/lint.ts";
+export { evalWithParams, renderRecipe, type RenderResult } from "./recipe/render.ts";
+export { verifyResult, type VerifyOutcome } from "./recipe/verify.ts";
