@@ -25,6 +25,20 @@ two things it doesn't do:
 | Agent rules | [AGENTS.md](./AGENTS.md) · [CLAUDE.md](./CLAUDE.md) · [`.cursor/rules`](./.cursor/rules/) |
 | Security | [SECURITY.md](./SECURITY.md) |
 
+## How it works
+
+```bash
+tyto learn wiki-status --session task-1            # start recording that agent-browser session
+# … an agent (or you) does the task once with agent-browser --session task-1 …
+tyto learn status wiki-status                       # typed inputs so far: input_1  Search Wikipedia
+tyto learn stop wiki-status --task "IUCN status of a species on Wikipedia" --param input_1=species
+tyto compile wiki-status                            # one model session → a verified draft recipe
+tyto run wiki-status --species "Tiger"              # {"status":"Endangered",…} in ~0.3 s, no model
+```
+
+A recipe that can't find what it expects returns a **MISS** (exit 3) instead of guessing. Recipes that use your
+saved logins run only after `tyto recipes approve`. For one-off pages, `tyto open <url>` prints the brief.
+
 ## Measured (2026-09-29, M4 Max)
 
 | | Time per task |
@@ -53,7 +67,7 @@ npm run test:live    # opt-in: needs agent-browser installed
 | `@tyto/llm` | OpenAI-compatible and Anthropic HTTP model adapters |
 | `@tyto/agent-browser` | Runs the agent-browser CLI (argv, batch JSON); reads its event stream |
 | `@tyto/store` | Recipes, traces, session locks, log marks, replay config under `~/.tyto` |
-| `@tyto/cli` | The `tyto` command (`learn`, `run`, `test`, `recipes`, `open`, `brief`, `find`, actions) |
-| `@tyto/compiler` | Coming in slice 6 |
+| `@tyto/cli` | The `tyto` command (`learn`, `compile`, `run`, `test`, `recipes`, `open`, `brief`, `find`, actions) |
+| `@tyto/compiler` | Runs the compiler session (Claude Code headless) limited to `tyto compile-tool` |
 
 A [YOLOVibeCode](https://github.com/YOLOVibeCode) public repo. Product: Noctusoft, Inc. MIT license.

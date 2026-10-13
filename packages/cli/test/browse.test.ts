@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SecretRedactor, type BatchStepResult, type RunOptions, type RunOutput } from "@tyto/core";
-import { FakeBrowserRunner, FakeSessionLock, MemoryLogMarks, MemoryRecipeStore } from "@tyto/core/testing";
+import { FakeBrowserRunner, FakeCompiler, FakeSessionLock, MemoryLogMarks, MemoryRecipeStore, MemoryTraceStore } from "@tyto/core/testing";
 import { main, type CliDeps } from "../src/index.ts";
 
 /** A scripted page that answers agent-browser commands with agent-browser's JSON shapes. */
@@ -60,6 +60,10 @@ function harness() {
     exec: { runner, lock: new FakeSessionLock(), paths: { config: "/c.json", policy: "/p.json" } },
     browse: { runner, marks, redactor: new SecretRedactor(), session: "default", now: () => 1_790_000_000_000 },
     learn: { spawnListener: async () => undefined, control: async () => ({ ok: false }) },
+    traces: new MemoryTraceStore(),
+    compiler: new FakeCompiler(),
+    compileTool: { dir: undefined, readStdin: async () => "" },
+    confirm: async () => false,
     out: (s) => out.push(s),
     err: (s) => out.push(`ERR ${s}`),
   };

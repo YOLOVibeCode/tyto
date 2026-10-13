@@ -1,6 +1,7 @@
 export {
   FakeBrowserRunner,
   FakeClock,
+  FakeCompiler,
   FakeEventSource,
   FakeModel,
   FakeSessionLock,

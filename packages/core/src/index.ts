@@ -38,3 +38,8 @@ export { actionToArgv } from "./trace/argv.ts";
 export { buildTrace, type TraceOptions } from "./trace/build.ts";
 export { isSensitiveLocator } from "./recipe/lint.ts";
 export { Recorder, type RecorderDeps } from "./trace/recorder.ts";
+export { COMPILER_CARD } from "./compile/card.ts";
+export { compilerPrompt } from "./compile/prompt.ts";
+export { extractRecipeJson } from "./compile/extract.ts";
+export { checkCompiled, type CheckResult } from "./compile/check.ts";
+export { compileTrace, type CompileOutcome } from "./compile/compile.ts";

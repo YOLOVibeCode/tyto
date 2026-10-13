@@ -1,0 +1,11 @@
+{
+  "name": "@tyto/compiler",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Compiler adapters: run a model session that may only use `tyto compile-tool`.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@tyto/core": "*"
+  }
+}

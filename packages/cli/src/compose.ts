@@ -3,6 +3,9 @@ import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { AgentBrowserRunner, StreamEventSource } from "@tyto/agent-browser";
+import { ClaudeCodeCompiler } from "@tyto/compiler";
+import { createInterface } from "node:readline/promises";
+import { text } from "node:stream/consumers";
 import { Recorder, SecretRedactor } from "@tyto/core";
 import { FileLogMarks, FileSessionLock, FileTraceStore, FilesystemRecipeStore, ensureReplayFiles } from "@tyto/store";
 import { requestControl, serveControl } from "./learn/control.ts";
@@ -51,6 +54,21 @@ export async function composeDeps(env: NodeJS.ProcessEnv = process.env): Promise
         });
         return 0;
       },
+    },
+    traces: new FileTraceStore(join(home, "traces")),
+    compiler: new ClaudeCodeCompiler({ tytoBin: BIN, workRoot: join(home, "compile"), model: env.TYTO_COMPILER_MODEL ?? "sonnet", baseEnv: env }),
+    compileTool: {
+      dir: env.TYTO_COMPILE_DIR && env.TYTO_COMPILE_DIR !== "" ? env.TYTO_COMPILE_DIR : undefined,
+      readStdin: () => text(process.stdin),
+    },
+    confirm: async (question) => {
+      if (!process.stdin.isTTY) return false;
+      const rl = createInterface({ input: process.stdin, output: process.stderr });
+      try {
+        return /^y(es)?$/i.test((await rl.question(question)).trim());
+      } finally {
+        rl.close();
+      }
     },
     out: (line) => process.stdout.write(`${line}\n`),
     err: (line) => process.stderr.write(`${line}\n`),
