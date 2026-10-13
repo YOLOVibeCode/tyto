@@ -45,11 +45,14 @@ stealth or anti-detection, unattended purchases or transfers, sharing recipes or
   and stores it as a draft.
 - **Run:** `tyto run <recipe> --param value …` renders the recipe, runs it as one agent-browser batch, verifies
   the result, and prints JSON (exit 0) or a MISS with the reason (exit 3).
+- **Batch:** `tyto run <recipe> --each inputs.jsonl [--concurrency N]` replays the recipe once per line (a JSON
+  object of params), up to N at a time (default 3, max 8), each in its own lane and browser, and prints one JSON
+  line per input in input order. Recipes that use your logins run one input at a time.
 - **Repair:** on a MISS, `tyto repair` sends the missed and previously-passing inputs to the compiler; the
   repaired recipe must pass all of them before it replaces the old one.
 - **Brief:** `tyto open|brief|find` and action pass-through that reports what changed after each action.
-- **Sessions:** replays run in `tyto-rx` with **no saved logins** and a domain allowlist; recipes that need your
-  login run in `tyto-rx-auth` only after you approve them.
+- **Sessions:** replays run in `tyto-rx` (batches in `tyto-rx-1` … `tyto-rx-8`) with **no saved logins** and a
+  domain allowlist; recipes that need your login run in `tyto-rx-auth` only after you approve them.
 
 ## 6. Security
 

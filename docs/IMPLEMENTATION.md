@@ -66,7 +66,8 @@ browser launch errors.
 
 **Sessions.** `tyto-rx`: Tyto-owned agent-browser config via `AGENT_BROWSER_CONFIG`, which replaces the user's
 config entirely (keeps only `executablePath`; no restore), with `--allowed-domains <origin hosts + domains>`. `tyto-rx-auth`: `--restore main`, only for approved `auth` recipes.
-Both use an action policy denying download and upload.
+Both use an action policy denying download and upload. Batch lanes `tyto-rx-1` … `tyto-rx-8` are `tyto-rx` under
+another name (slice 10).
 
 ## 4. Slices and spec sentences
 
@@ -242,7 +243,45 @@ Wikipedia task in 194 s (6/6 species correct afterwards, no model).
 - `config selects the compiler: claude (default) or openai with baseUrl and model`
 - `openai without a base URL or model is a clear error`
 
-Later: request → recipe routing without a model (local embeddings), session pool, MCP.
+### Slice 10 — batch runs
+`tyto run <recipe> --each <file|-> [--concurrency N]`: the use case "the same task over many inputs" (SPEC §3),
+the way Obscura's `scrape --concurrency` runs many pages at once. Input is JSON Lines, one object of param values
+(strings or numbers) per line, at most 10,000 inputs and 16 MiB; other `--param` flags are added to every line, and
+a line's own value wins. Lint, approval, and every input's params are checked before any browser call
+(65 · 77 · 64 naming the index). Public recipes take up to N free lanes from `tyto-rx-1` … `tyto-rx-8` without
+waiting (so two batches share the pool and neither blocks `tyto run` in `tyto-rx`); each lane holds its lock for
+the batch and takes the next input until none are left. Each lane is its own browser (~0.45 GB for headless
+Chrome, measured), hence the default of 3. Lanes start cold, so a batch pays the browser starts once: measured
+in Colima, 6 instant pages took 4.1 s in 3 lanes, and 12 pages that answer in 400 ms took 3.9 s in 3 lanes against
+5.0 s one after another in a warm `tyto-rx`. It pays off from about 10 inputs; for a few, plain `tyto run` is as fast. Auth recipes run one input at a time in `tyto-rx-auth`. Output is one
+JSON line per input, in input order: `{index, input, hit: true, result}`, `{…, hit: false, miss, step}`, or
+`{…, hit: false, error, code}`; stderr gets a summary and the repair command for the first miss. Exit 0 if every
+input hit, 3 if some missed and none failed, otherwise the code of the first input that failed. A missing
+agent-browser stops the batch; inputs not yet run are reported as `not run` (69). The lanes are closed under
+Tyto's agent-browser config when the batch ends (`tyto-rx` and `tyto-rx-auth` stay warm); inputs that hit are
+added to the regression cases (capped at 10). `tyto doctor` lists the lanes, and `--fix` now closes every Tyto
+session under Tyto's config: under the user's own, `close` may save that session's cookies into their restore
+state.
+- `parseBatchInputs reads one JSON object of param values per line and skips blank lines`
+- `names the line of anything that is not an object of strings or numbers`; `refuses an empty file`
+- `runs public inputs in lanes tyto-rx-1 … tyto-rx-N with the recipe's allowlist, never in tyto-rx`
+- `never runs more inputs at once than the concurrency`
+- `prints one line per input in input order, even when later inputs finish first`
+- `a hit line carries the verified result and a miss line the miss and step; exit 3 when any input misses`
+- `exits 0 when every input hits and returns their params for the regression cases`
+- `recipes that fail lint exit 65 and bad params exit 64 before any browser call`
+- `takes free lanes only: a lane another batch holds is skipped`; `exits 75 before any browser call when every lane is busy`
+- `an auth recipe runs one input at a time in tyto-rx-auth, and only when approved`
+- `closes its lanes with Tyto's config when the batch ends and releases their locks`; `keeps tyto-rx-auth open after an auth batch, as a single run does`
+- `a missing agent-browser stops the batch: inputs not yet run are reported, exit 69`
+- CLI: `tyto run --each prints one JSON line per input, in input order, and exits 0 when all hit`; `--each - reads the
+  inputs from stdin`; `adds the other --param flags to every input, and a line's own value wins`; `prints a summary
+  and the repair command for the first miss on stderr, and exits 3`; `records the inputs that hit as regression
+  cases`; `a bad line exits 64 and names the line`; `--concurrency must be 1 to 8 and needs --each`
+- `Tyto's sessions include the batch lanes`; `closing one uses Tyto's agent-browser config, never yours`
+- live: `a batch over the fixture hits every input in order across lanes and closes them`
+
+Later: request → recipe routing without a model (local embeddings), MCP.
 
 ## 5. Verification
 

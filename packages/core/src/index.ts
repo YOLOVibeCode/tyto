@@ -13,6 +13,17 @@ export { EXIT, type ExitCode } from "./run/exit.ts";
 export { DEFAULT_ACTION_TIMEOUT_MS, replaySession, type ReplayPaths, type ReplaySession } from "./run/session.ts";
 export { isLaunchError } from "./run/launch-error.ts";
 export { executeRecipe, type ExecDeps, type ExecOptions, type ExecOutcome } from "./run/execute.ts";
+export {
+  BATCH_LANES,
+  DEFAULT_CONCURRENCY,
+  MAX_BATCH_INPUTS,
+  parseBatchInputs,
+  runBatch,
+  type BatchInputs,
+  type BatchLine,
+  type BatchOptions,
+  type BatchOutcome,
+} from "./run/batch.ts";
 export type { Brief, BriefCookie, BriefInput, ConsoleEntry, CookieEntry, ErrorEntry, LogCounts, PageFacts, RequestEntry } from "./brief/types.ts";
 export { assembleBrief } from "./brief/assemble.ts";
 export { renderBrief } from "./brief/render.ts";

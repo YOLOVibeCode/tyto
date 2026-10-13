@@ -15,7 +15,9 @@ allowed-tools: Bash(tyto:*)
 
 1. **Before browsing**, run \`tyto recipes\`. If one matches, \`tyto run <name> --param value\` answers in about
    0.3 s with no model. Exit 0 prints the JSON answer. Exit 3 is a MISS (the site changed): run the printed
-   \`tyto repair …\` command, or fall back to agent-browser.
+   \`tyto repair …\` command, or fall back to agent-browser. **Many inputs** (about 10 or more): put one JSON object
+   of params per line in a file; \`tyto run <name> --each inputs.jsonl\` runs them in parallel and prints one JSON
+   line per input, in order.
 2. **A task that will repeat**: \`tyto learn <name> --session <s>\`, do it once with \`agent-browser --session <s> …\`,
    check typed inputs with \`tyto learn status <name>\`, then
    \`tyto learn stop <name> --task "<what it answers>" --param input_N=<param>\` and \`tyto compile <name>\`.
