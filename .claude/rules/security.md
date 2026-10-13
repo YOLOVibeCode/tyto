@@ -1,7 +1,12 @@
 # Security
 
-Public repo. Never commit `.env`, profiles, cookies, tokens, keys, vault plaintext.
+Public repo. Never commit `.env`, browser profiles, agent-browser state files, traces, cookies, tokens, keys.
 
-- `npm run secrets:scan` and gitleaks must stay green. Do not print secret values.
-- Identity: encrypt at rest; restore into Chrome/Edge only; grant per origin.
-- `Redactor` before model and tape. Loopback bind only. Confirm destructive acts.
+- `npm run secrets:scan` and gitleaks stay green. Never print secret values.
+- Recipes pass lint before they are stored or run: no `{{` inside eval code (eval reads `params`),
+  command allowlist, rendered URLs inside `origins`, eval read-only heuristics.
+- Default replay session has no saved logins and runs with `--allowed-domains`. Logged-in replay only for
+  recipes with `auth: true` that the user approved.
+- Traces: typed values become placeholders; password-like fills are rejected; `Redactor` before disk and model.
+- Compiler: page text is fenced as data; `claude -p` may only run `tyto compile-tool`; its output is linted and
+  stored as a draft.

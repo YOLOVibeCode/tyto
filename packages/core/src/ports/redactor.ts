@@ -1,7 +1,7 @@
-import type { CompleteRequest, TapeEvent } from "../types.ts";
+import type { CompleteRequest } from "../types.ts";
 
+/** Strips secret-shaped values before text is stored or sent to a model. */
 export interface Redactor {
-  tape(event: TapeEvent): TapeEvent;
-  prompt(req: CompleteRequest): CompleteRequest;
   safe(text: string): string;
+  prompt(req: CompleteRequest): CompleteRequest;
 }

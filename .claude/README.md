@@ -9,5 +9,6 @@ Loaded with [`CLAUDE.md`](../CLAUDE.md). Cursor equivalents:
 | `security.md` | Always |
 | `typescript.md` | `**/*.ts` |
 | `vitest.md` | tests |
-| `cdp.md` | `@tyto/cdp` |
-| `extension.md` | `extension/` |
+| `node-packages.md` | adapter packages |
+| `docs.md` | `docs/` |
+| `github-actions.md` | workflows |

@@ -1,14 +1,15 @@
 # TDD and ISP (mandatory)
 
-Tests define behavior. Ports define ownership. Do not ship a change that
-violates this file.
+Tests define behavior. Ports define ownership. Do not ship a change that violates this file.
 
 1. Failing test first. `it("…")` is a spec sentence from `docs/IMPLEMENTATION.md`.
-2. `npm test` is airplane-mode (no Chrome, no network, no keys).
-3. No `IBrowser` with twenty methods. One port, one file, `packages/core/src/ports/`.
-4. `@tyto/core` is pure: no Playwright, no CDP socket, no vendor LLM SDK, no LiteLLM type.
-5. Perch/MCP must not depend on `RawCdpPort` or `CredentialStorePort`.
-6. Hard-to-fake port → wrong port. Separate fakes, not a god `FakeTyto`.
-7. Trusted `Input` clicks. Session JSON has no `backendNodeId`, cookies, or tokens.
-8. `Redactor` before every `ModelPort.complete` and before tape persist.
-9. Bind `127.0.0.1` only. Finish with `npm run check`.
+2. `npm test` is offline: no browser, no agent-browser binary, no network, no keys. Live tests go in
+   `packages/*/test/live/` and run only with `npm run test:live` (`TYTO_LIVE=1`).
+3. One port per file in `packages/core/src/ports/`. No god interface.
+4. `@tyto/core` is pure: no `child_process`, `fs`, `net`/`http`, `fetch`, `WebSocket`, browser drivers,
+   or vendor LLM SDKs. `npm run lint:imports` enforces it.
+5. Adapters (`agent-browser`, `store`, `compiler`, `cli`) implement ports. Tests use separate fakes from
+   `@tyto/core/testing`, not one god fake.
+6. A port that is hard to fake is the wrong port.
+7. `Redactor` before anything is written to disk or sent to a model.
+8. Finish with `npm run check`.

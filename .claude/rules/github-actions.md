@@ -1,5 +1,5 @@
 # GitHub Actions
 
-- Least-privilege `permissions`. Node 22, `npm ci`, `npm run check`.
+- Least-privilege `permissions`. Node 22, `npm ci`, the `npm run check` steps.
 - Gitleaks with `--redact`. Never echo secrets.
-- Do not download Chromium in default CI. No privileged secrets on fork PRs.
+- Default CI never installs a browser or agent-browser. No privileged secrets on fork PRs.

@@ -1,42 +1,17 @@
 ---
-description: Public-repo and kernel security — secrets, identity vault, loopback
+description: Public-repo and recipe security — secrets, lint gates, logged-in replay, traces
 alwaysApply: true
 ---
 
-# Security (public repository)
+# Security
 
-This repo is public. Treat every commit as world-readable.
+Public repo. Never commit `.env`, browser profiles, agent-browser state files, traces, cookies, tokens, keys.
 
-## Never commit
-
-`.env`, API keys, `TYTO_HOST_TOKEN`, browser `tmp/` profiles, cookies,
-`Set-Cookie` / `Authorization` values, vault ciphertext, private keys.
-
-Copy `.env.example` → `.env` locally. If a live secret is committed: **rotate**,
-do not only delete the file.
-
-Scanners (must stay green): `npm run secrets:scan`, gitleaks, GitHub secret scanning.
-
-Do not print secret values in logs, test output, or chat.
-
-```ts
-// ❌ BAD
-console.log("cookie", hdr);
-
-// ✅ GOOD
-tape.push("network", redactor.safe(hdr));
-```
-
-## Identity
-
-Auth material is **data AND secret**. Encrypted at rest; DEK in OS keychain
-(memory fake in tests). Restore **only** into Chrome/Edge. No OS ticket harvest,
-no impersonation, no SDK export of cookies.
-
-Capture/restore requires an explicit origin grant. Expired bundles yield to
-the operator — do not replay a dead session.
-
-## Control plane
-
-Host and debug port: `127.0.0.1` + token. Extension: native messaging only;
-no `window.tyto`. Confirm submit / purchase / delete / send.
+- `npm run secrets:scan` and gitleaks stay green. Never print secret values.
+- Recipes pass lint before they are stored or run: no `{{` inside eval code (eval reads `params`),
+  command allowlist, rendered URLs inside `origins`, eval read-only heuristics.
+- Default replay session has no saved logins and runs with `--allowed-domains`. Logged-in replay only for
+  recipes with `auth: true` that the user approved.
+- Traces: typed values become placeholders; password-like fills are rejected; `Redactor` before disk and model.
+- Compiler: page text is fenced as data; `claude -p` may only run `tyto compile-tool`; its output is linted and
+  stored as a draft.

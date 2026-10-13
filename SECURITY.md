@@ -1,7 +1,7 @@
 # Security
 
-Tyto drives a real Chrome or Edge profile with **trusted CDP input**. That is
-indistinguishable from a human. Treat the host as a kernel.
+Tyto replays browser tasks through agent-browser, sometimes with your logins. A replayed click is a real
+click. Treat recipes as code.
 
 ## Report a vulnerability
 
@@ -14,9 +14,9 @@ cookie dumps, or live credentials.
 This repository is public. **Never** commit:
 
 - API keys (`TYTO_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`)
-- Host tokens (`TYTO_HOST_TOKEN`)
-- Browser profiles (`tmp/`, user-data-dir clones)
-- Cookies, `Set-Cookie` headers, bearer tokens, vault ciphertext
+- Browser profiles and agent-browser state files (`~/.agent-browser/sessions/*`)
+- Tyto traces (`~/.tyto/traces`)
+- Cookies, `Set-Cookie` headers, bearer tokens
 - Private keys (`.pem`, `.key`, SSH keys)
 
 Copy [`.env.example`](./.env.example) to `.env` (gitignored).
@@ -25,7 +25,7 @@ Copy [`.env.example`](./.env.example) to `.env` (gitignored).
 
 | Layer | What |
 |---|---|
-| `.gitignore` | Profiles, `.env`, vault dirs, keys |
+| `.gitignore` | Profiles, `.env`, keys, local state |
 | `npm run secrets:scan` | Pattern scan; **does not print secret values** |
 | `.githooks/pre-commit` | Staged-file scan + core import boundary |
 | GitHub Actions `gitleaks` | Default + Tyto rules in [`.gitleaks.toml`](./.gitleaks.toml) |
@@ -37,12 +37,12 @@ Enable the local hook after clone:
 git config core.hooksPath .githooks
 ```
 
-## Product control plane (not optional)
+## Product rules (not optional)
 
-- SDK and debug port bind **`127.0.0.1` only**. Never `0.0.0.0`.
-- Page JavaScript cannot command Tyto.
-- Auth material is encrypted at rest; the model never sees cookies or tokens.
-- Identity is **your own**, restored **only** into Chrome/Edge. No OS ticket
-  harvest, no impersonation, no export to non-browser clients.
+- Recipes must pass lint before they are stored or run: command allowlist, no templating inside eval code,
+  rendered URLs inside the recipe's `origins`, read-only eval heuristics, no password-like fills.
+- Replays run without saved logins by default. Recipes that need your login run only after you approve them.
+- Traces replace typed values with placeholders and are redacted before they touch disk or a model.
+- Tyto never exports cookies or tokens; agent-browser owns browser state.
 
-See [docs/SPEC.md](./docs/SPEC.md) §6 and [docs/IMPLEMENTATION.md](./docs/IMPLEMENTATION.md) §3.7.
+See [docs/SPEC.md](./docs/SPEC.md) §6 and [docs/IMPLEMENTATION.md](./docs/IMPLEMENTATION.md) §3.

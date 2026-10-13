@@ -39,6 +39,7 @@ paths = [
   '''.*\.md$''',
   '''packages/core/src/identity/redact\.ts$''',
   '''packages/.*/test/''',
+  # Removed in the rebuild but still in git history (fake test fixtures):
   '''extension/test/''',
   '''e2e/''',
   '''scripts/check-secrets\.mjs$''',
