@@ -48,6 +48,7 @@ tyto learn status wiki-status                       # typed inputs so far: input
 tyto learn stop wiki-status --task "IUCN status of a species on Wikipedia" --param input_1=species
 tyto compile wiki-status                            # one model session → a verified draft recipe
 tyto run wiki-status --species "Tiger"              # {"status":"Endangered",…} in ~0.3 s, no model
+tyto run wiki-status --each species.jsonl           # one {"species":"…"} per line → one JSON line each, 3 at a time
 ```
 
 A recipe that can't find what it expects returns a **MISS** (exit 3) instead of guessing, and prints the

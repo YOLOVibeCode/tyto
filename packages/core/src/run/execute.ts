@@ -11,7 +11,13 @@ import { replaySession, type ReplayPaths } from "./session.ts";
 
 export type ExecDeps = { runner: BrowserRunner; lock: SessionLock; paths: ReplayPaths };
 
-export type ExecOptions = { deadlineMs?: number; lockWaitMs?: number; actionTimeoutMs?: number };
+export type ExecOptions = {
+  deadlineMs?: number;
+  lockWaitMs?: number;
+  actionTimeoutMs?: number;
+  /** A batch lane: public recipes run in `tyto-rx-<lane>` instead of `tyto-rx`. */
+  lane?: number;
+};
 
 export type ExecOutcome =
   | { kind: "hit"; result: Record<string, unknown>; params: Record<string, ParamValue> }
@@ -19,7 +25,7 @@ export type ExecOutcome =
   | { kind: "error"; code: ExitCode; message: string };
 
 const DEFAULT_DEADLINE_MS = 15_000;
-const DEFAULT_LOCK_WAIT_MS = 10_000;
+export const DEFAULT_LOCK_WAIT_MS = 10_000;
 
 function firstFailure(results: readonly BatchStepResult[]): { index: number; error: string | null } | null {
   const index = results.findIndex((r) => !r.success);
@@ -46,7 +52,7 @@ export async function executeRecipe(
   const rendered = renderRecipe(recipe, input);
   if (!rendered.ok) return { kind: "error", code: EXIT.usage, message: rendered.error };
 
-  const session = replaySession(recipe, deps.paths, opts.actionTimeoutMs);
+  const session = replaySession(recipe, deps.paths, opts.actionTimeoutMs, opts.lane);
   const release = await deps.lock.acquire(session.session, opts.lockWaitMs ?? DEFAULT_LOCK_WAIT_MS);
   if (!release) return { kind: "error", code: EXIT.busy, message: `session ${session.session} is busy` };
 

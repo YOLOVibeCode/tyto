@@ -14,13 +14,14 @@ export const DEFAULT_ACTION_TIMEOUT_MS = 6000;
 /**
  * Public recipes run in `tyto-rx`: Tyto's own config (replaces the user's, so no saved logins) and a domain
  * allowlist. Approved `auth` recipes run in `tyto-rx-auth` with the user's saved logins (`--restore main`);
- * agent-browser refuses `--allowed-domains` together with `--restore`.
+ * agent-browser refuses `--allowed-domains` together with `--restore`. A batch runs public recipes in lanes,
+ * `tyto-rx-<lane>`, with the same settings; auth recipes have no lanes.
  */
-export function replaySession(recipe: Recipe, paths: ReplayPaths, timeoutMs = DEFAULT_ACTION_TIMEOUT_MS): ReplaySession {
+export function replaySession(recipe: Recipe, paths: ReplayPaths, timeoutMs = DEFAULT_ACTION_TIMEOUT_MS, lane?: number): ReplaySession {
   const env = { AGENT_BROWSER_DEFAULT_TIMEOUT: String(timeoutMs), AGENT_BROWSER_CONFIG: paths.config };
   if (recipe.auth) {
     return { session: "tyto-rx-auth", args: ["--restore", "main", "--action-policy", paths.policy], env };
   }
   const hosts = [...new Set([...recipe.origins.map((o) => new URL(o).hostname), ...recipe.domains])];
-  return { session: "tyto-rx", args: ["--allowed-domains", hosts.join(","), "--action-policy", paths.policy], env };
+  return { session: lane === undefined ? "tyto-rx" : `tyto-rx-${lane}`, args: ["--allowed-domains", hosts.join(","), "--action-policy", paths.policy], env };
 }

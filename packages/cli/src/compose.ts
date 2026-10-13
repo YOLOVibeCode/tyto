@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { AgentBrowserRunner, StreamEventSource, agentBrowserSocketDir } from "@tyto/agent-browser";
 import { execFile } from "node:child_process";
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, stat } from "node:fs/promises";
 import { constants } from "node:fs";
 import { delimiter } from "node:path";
 import { promisify } from "node:util";
@@ -17,9 +17,11 @@ import { Recorder, SecretRedactor } from "@tyto/core";
 import { FileLogMarks, FileSessionLock, FileTraceStore, FilesystemRecipeStore, ensureReplayFiles } from "@tyto/store";
 import { requestControl, serveControl } from "./learn/control.ts";
 import { runListener } from "./learn/listener.ts";
+import { TYTO_SESSIONS, closeTytoSession } from "./sessions.ts";
 
 const run = promisify(execFile);
-const TYTO_SESSIONS = ["tyto-rx", "tyto-rx-auth", "tyto-compile"];
+/** `tyto run --each` reads at most this much from a file. */
+const MAX_INPUT_BYTES = 16 * 1024 * 1024;
 
 async function versionOf(bin: string): Promise<string | null> {
   try {
@@ -123,6 +125,11 @@ export async function composeDeps(env: NodeJS.ProcessEnv = process.env): Promise
       dir: env.TYTO_COMPILE_DIR && env.TYTO_COMPILE_DIR !== "" ? env.TYTO_COMPILE_DIR : undefined,
       readStdin: () => text(process.stdin),
     },
+    readInput: async (path) => {
+      if (path === "-") return text(process.stdin);
+      if ((await stat(path)).size > MAX_INPUT_BYTES) throw new Error(`larger than ${MAX_INPUT_BYTES / 1024 / 1024} MiB; split it`);
+      return readFile(path, "utf8");
+    },
     confirm: async (question) => {
       if (!process.stdin.isTTY) return false;
       const rl = createInterface({ input: process.stdin, output: process.stderr });
@@ -140,9 +147,7 @@ export async function composeDeps(env: NodeJS.ProcessEnv = process.env): Promise
         claudeVersion: () => versionOf("claude"),
         launcher: () => onPath("tyto", env.PATH),
         sessions: () => runningSessions(env),
-        closeSession: async (session) => {
-          await runner.run(["close"], { session });
-        },
+        closeSession: closeTytoSession(runner, paths.config),
       },
     },
     out: (line) => process.stdout.write(`${line}\n`),

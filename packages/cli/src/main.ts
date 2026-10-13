@@ -1,4 +1,17 @@
-import { EXIT, appendRegression, executeRecipe, type Compiler, type ExecDeps, type RecipeStore, type TraceStore } from "@tyto/core";
+import {
+  BATCH_LANES,
+  DEFAULT_CONCURRENCY,
+  EXIT,
+  appendRegression,
+  executeRecipe,
+  parseBatchInputs,
+  runBatch,
+  type Compiler,
+  type ExecDeps,
+  type Recipe,
+  type RecipeStore,
+  type TraceStore,
+} from "@tyto/core";
 import { approve, compile, compileTool, type CompileToolDeps } from "./compile/commands.ts";
 import { repair } from "./compile/repair.ts";
 import { UsageError, asStrings, paramFlags, parseParams, subset } from "./args.ts";
@@ -16,6 +29,8 @@ export type CliDeps = {
   compiler: Compiler;
   compileTool: CompileToolDeps;
   confirm: (question: string) => Promise<boolean>;
+  /** Reads `tyto run --each` inputs: a file path, or `-` for stdin. Wired only in the real composition root. */
+  readInput?: (path: string) => Promise<string>;
   /** Setup commands (install, doctor); wired only in the real composition root. */
   setup?: { install: InstallOptions; doctor: DoctorDeps };
   out: (line: string) => void;
@@ -38,21 +53,90 @@ export const USAGE = `usage: tyto <command>
   tyto compile <name>                     turn a recorded trace into a draft recipe (one model session)
   tyto repair <recipe> [--param value ...] fix a recipe that missed on that input (one model session)
   tyto run <recipe> [--param value ...]   replay a recipe with no model (exit 0 hit, 3 miss)
+  tyto run <recipe> --each <file|-> [--concurrency N] [--param value ...]
+                                          one replay per JSON line, N at a time (default ${DEFAULT_CONCURRENCY}, max ${BATCH_LANES});
+                                          prints one JSON line per input, in order
   tyto test <recipe>                      run the recipe's regression cases
   tyto recipes [--json]                   list recipes
   tyto recipes show <recipe>              print a recipe
   tyto recipes approve <recipe> [--yes]   allow a recipe to run (required for recipes that use your logins)
   tyto recipes rm <recipe>                delete a recipe`;
 
+/** In `tyto run`, `--each` and `--concurrency` are Tyto's; every other flag is a recipe param. */
+function splitBatchFlags(args: readonly string[]): { each?: string; concurrency?: string; rest: string[] } {
+  const found: { each?: string; concurrency?: string } = {};
+  const rest: string[] = [];
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i] ?? "";
+    const m = /^--(each|concurrency)(?:=(.*))?$/s.exec(arg);
+    if (!m) {
+      rest.push(arg);
+      continue;
+    }
+    const flag = m[1] as "each" | "concurrency";
+    const value = m[2] ?? args[i + 1];
+    if (m[2] === undefined) i += 1;
+    if (value === undefined || value === "") throw new UsageError(flag === "each" ? "--each needs a file (or - for stdin)" : "--concurrency needs a number");
+    found[flag] = value;
+  }
+  return { ...found, rest };
+}
+
+async function runEach(recipe: Recipe, file: string, concurrencyArg: string | undefined, shared: Readonly<Record<string, string>>, deps: CliDeps): Promise<number> {
+  const concurrency = concurrencyArg === undefined ? DEFAULT_CONCURRENCY : /^\d+$/.test(concurrencyArg) ? Number(concurrencyArg) : NaN;
+  if (!(concurrency >= 1 && concurrency <= BATCH_LANES)) throw new UsageError(`--concurrency must be a whole number from 1 to ${BATCH_LANES}`);
+  if (!deps.readInput) throw new UsageError("--each is not available here");
+  const label = file === "-" ? "stdin" : file;
+  let text: string;
+  try {
+    text = await deps.readInput(file);
+  } catch (e) {
+    deps.err(`cannot read ${label}: ${e instanceof Error ? e.message : String(e)}`);
+    return EXIT.usage;
+  }
+  const parsed = parseBatchInputs(text);
+  if (!parsed.ok) {
+    deps.err(`${label}: ${parsed.error}`);
+    return EXIT.usage;
+  }
+  const missed: Record<string, string>[] = [];
+  const outcome = await runBatch(
+    recipe,
+    parsed.inputs.map((input) => ({ ...shared, ...input })),
+    deps.exec,
+    {
+      concurrency,
+      onLine: (line) => {
+        deps.out(JSON.stringify(line));
+        if ("miss" in line) missed.push(line.input);
+      },
+    },
+  );
+  if (outcome.kind === "error") {
+    deps.err(outcome.message);
+    return outcome.code;
+  }
+  const lanes = outcome.lanes.length;
+  deps.err(`batch ${recipe.name}: ${outcome.hits} hit, ${outcome.misses} miss, ${outcome.errors} ${outcome.errors === 1 ? "error" : "errors"} (${lanes} ${lanes === 1 ? "lane" : "lanes"})`);
+  const first = missed[0];
+  if (first) deps.err(`repair: tyto repair ${recipe.name} ${paramFlags(first)}`.trimEnd());
+  const updated = outcome.passed.reduce((r, params) => appendRegression(r, asStrings(params)), recipe);
+  if (updated !== recipe) await deps.store.save(updated).catch(() => undefined);
+  return outcome.code;
+}
+
 async function run(args: readonly string[], deps: CliDeps): Promise<number> {
-  const [name, ...rest] = args;
+  const [name, ...flags] = args;
   if (!name) throw new UsageError("tyto run needs a recipe name");
   const recipe = await deps.store.get(name);
   if (!recipe) {
     deps.err(`unknown recipe: ${name} (see tyto recipes)`);
     return EXIT.usage;
   }
+  const { each, concurrency, rest } = splitBatchFlags(flags);
   const params = parseParams(rest);
+  if (each !== undefined) return runEach(recipe, each, concurrency, params, deps);
+  if (concurrency !== undefined) throw new UsageError("--concurrency needs --each");
   const outcome = await executeRecipe(recipe, params, deps.exec);
   switch (outcome.kind) {
     case "hit":
