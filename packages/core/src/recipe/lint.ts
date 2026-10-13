@@ -23,6 +23,11 @@ const EVAL_FORBIDDEN: ReadonlyArray<[RegExp, string]> = [
 const SENSITIVE =
   /(?:^|[^a-z])(?:pass(?:word|wd|code|phrase)?|token|secret|otp|one[-_ ]?time|cvv|cvc|ssn|pin)(?:[^a-z]|$)|cc-(?:number|csc|exp)|card/i;
 
+/** Locators for password, token, OTP, or card fields — never recorded or replayed with typed values. */
+export function isSensitiveLocator(text: string): boolean {
+  return SENSITIVE.test(text);
+}
+
 const URL_PARAM_ONLY = /^\{\{\s*\w+\s*\|\s*url\s*\}\}$/;
 
 function opensAllowedOrigin(url: string, origins: readonly string[]): boolean {

@@ -51,9 +51,9 @@ npm run test:live    # opt-in: needs agent-browser installed
 |---|---|
 | `@tyto/core` | Recipes, lint, verify, brief, find, redaction, ports, fakes (pure) |
 | `@tyto/llm` | OpenAI-compatible and Anthropic HTTP model adapters |
-| `@tyto/agent-browser` | Runs the agent-browser CLI (argv, batch JSON) |
-| `@tyto/store` | Recipes, session locks, replay config under `~/.tyto` |
-| `@tyto/cli` | The `tyto` command (`open`, `brief`, `find`, actions, `run`, `test`, `recipes`) |
+| `@tyto/agent-browser` | Runs the agent-browser CLI (argv, batch JSON); reads its event stream |
+| `@tyto/store` | Recipes, traces, session locks, log marks, replay config under `~/.tyto` |
+| `@tyto/cli` | The `tyto` command (`learn`, `run`, `test`, `recipes`, `open`, `brief`, `find`, actions) |
 | `@tyto/compiler` | Coming in slice 6 |
 
 A [YOLOVibeCode](https://github.com/YOLOVibeCode) public repo. Product: Noctusoft, Inc. MIT license.

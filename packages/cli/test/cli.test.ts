@@ -27,6 +27,7 @@ function harness(runner = new FakeBrowserRunner(evalReturns(JSON.stringify({ tag
     store: new MemoryRecipeStore(...(recipes.length ? recipes : [recipe()])),
     exec: { runner, lock: new FakeSessionLock(), paths: { config: "/c.json", policy: "/p.json" } },
     browse: { runner, marks: new MemoryLogMarks(), redactor: new SecretRedactor(), session: "default", now: () => 0 },
+    learn: { spawnListener: async () => undefined, control: async () => ({ ok: false }) },
     out: (s) => out.push(s),
     err: (s) => err.push(s),
   };

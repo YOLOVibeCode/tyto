@@ -6,3 +6,5 @@ export type { BatchStepResult, BrowserRunner, RunOptions, RunOutput } from "./br
 export type { RecipeStore, RecipeSummary } from "./recipe-store.ts";
 export type { Release, SessionLock } from "./session-lock.ts";
 export type { LogMarks } from "./log-marks.ts";
+export type { BrowserEventSource } from "./browser-events.ts";
+export type { TraceStore } from "./trace-store.ts";

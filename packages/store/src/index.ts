@@ -3,3 +3,4 @@ export { FilesystemRecipeStore } from "./recipe-store.ts";
 export { FileSessionLock } from "./session-lock.ts";
 export { DEFAULT_USER_CONFIG, ensureReplayFiles } from "./replay-files.ts";
 export { FileLogMarks } from "./log-marks.ts";
+export { FileTraceStore } from "./trace-store.ts";
