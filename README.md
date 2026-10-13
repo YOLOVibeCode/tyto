@@ -25,6 +25,18 @@ two things it doesn't do:
 | Agent rules | [AGENTS.md](./AGENTS.md) · [CLAUDE.md](./CLAUDE.md) · [`.cursor/rules`](./.cursor/rules/) |
 | Security | [SECURITY.md](./SECURITY.md) |
 
+## Install
+
+Needs [agent-browser](https://github.com/vercel-labs/agent-browser) ≥ 0.38.1 and Node 22.22+/24.15+/26;
+`tyto compile` also needs [Claude Code](https://claude.com/claude-code).
+
+```bash
+brew install agent-browser && agent-browser install
+git clone git@github.com:YOLOVibeCode/tyto.git && cd tyto && npm install
+node packages/cli/bin/tyto.mjs install   # tyto on PATH + skill for Claude Code and Cursor
+tyto doctor
+```
+
 ## How it works
 
 ```bash

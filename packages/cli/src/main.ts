@@ -2,6 +2,8 @@ import { EXIT, appendRegression, executeRecipe, type Compiler, type ExecDeps, ty
 import { approve, compile, compileTool, type CompileToolDeps } from "./compile/commands.ts";
 import { repair } from "./compile/repair.ts";
 import { UsageError, asStrings, paramFlags, parseParams, subset } from "./args.ts";
+import { doctor, type DoctorDeps } from "./doctor.ts";
+import { install, type InstallOptions } from "./install.ts";
 import { ACTIONS, act, brief, find, open, type BrowseDeps } from "./browse.ts";
 import { learnCommand, type LearnDeps } from "./learn/commands.ts";
 
@@ -14,11 +16,16 @@ export type CliDeps = {
   compiler: Compiler;
   compileTool: CompileToolDeps;
   confirm: (question: string) => Promise<boolean>;
+  /** Setup commands (install, doctor); wired only in the real composition root. */
+  setup?: { install: InstallOptions; doctor: DoctorDeps };
   out: (line: string) => void;
   err: (line: string) => void;
 };
 
 export const USAGE = `usage: tyto <command>
+
+  tyto install [--bin-dir d]              put tyto on PATH; add the skill for Claude Code and Cursor
+  tyto doctor [--fix]                     check Node, agent-browser, Claude Code, PATH, Tyto's sessions
 
   tyto open <url> [--session s] [--json]  open a page and print its brief (errors, network, state, elements)
   tyto brief [--session s] [--json]       brief of the current page
@@ -136,6 +143,14 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
         return await test(args, deps);
       case "recipes":
         return await recipes(args, deps);
+      case "install": {
+        if (!deps.setup) throw new UsageError("install is not available here");
+        const i = args.indexOf("--bin-dir");
+        return await install({ ...deps.setup.install, ...(i >= 0 && args[i + 1] ? { binDir: args[i + 1] ?? "" } : {}) }, deps);
+      }
+      case "doctor":
+        if (!deps.setup) throw new UsageError("doctor is not available here");
+        return await doctor(args, deps.setup.doctor, deps);
       case "repair":
         return await repair(args, deps, deps);
       case "compile":
