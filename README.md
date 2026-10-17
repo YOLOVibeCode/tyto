@@ -13,7 +13,7 @@ two things it doesn't do:
   bodies, JavaScript errors, console errors, API calls, masked cookies, interactive elements, text. `tyto find`
   searches the whole page. Any model, including small local ones, gets there in one call.
 
-> **Status:** rebuilt (2026-09-30) per [docs/IMPLEMENTATION.md](./docs/IMPLEMENTATION.md), slices 1–9. The previous
+> **Status:** v0.1.0 (2026-10-17): rebuilt per [docs/IMPLEMENTATION.md](./docs/IMPLEMENTATION.md), slices 1–10. The previous
 > design (its own CDP browser stack) is archived at tag `archive/tyto-v0`; why:
 > [docs/DECISION-2026-09-29-agent-browser.md](./docs/DECISION-2026-09-29-agent-browser.md).
 
